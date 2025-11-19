@@ -484,6 +484,11 @@ struct ListCard: View {
 
                 Spacer()
 
+                // Shared/Private indicator
+                Image(systemName: list.isShared ? "person.2.fill" : "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(list.isShared ? .blue : .secondary)
+
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)
             }
@@ -564,18 +569,32 @@ struct ListDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    // View mode
                     Button {
                         viewMode = .grid
                     } label: {
-                        Label("Grid", systemImage: "square.grid.2x2")
+                        Label("Grid View", systemImage: "square.grid.2x2")
                     }
                     Button {
                         viewMode = .list
                     } label: {
-                        Label("List", systemImage: "list.bullet")
+                        Label("List View", systemImage: "list.bullet")
+                    }
+
+                    Divider()
+
+                    // Sharing toggle
+                    Button {
+                        list.isShared.toggle()
+                        try? viewContext.save()
+                    } label: {
+                        Label(
+                            list.isShared ? "Make Private" : "Make Shared",
+                            systemImage: list.isShared ? "lock" : "person.2"
+                        )
                     }
                 } label: {
-                    Image(systemName: viewMode == .grid ? "square.grid.2x2" : "list.bullet")
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -1406,6 +1425,15 @@ struct TitleDetailView: View {
                 if let imdbId = title.imdbId, !imdbId.isEmpty {
                     Link(destination: URL(string: "https://www.imdb.com/title/\(imdbId)")!) {
                         LinkButton(icon: "star", label: "IMDb")
+                    }
+                }
+
+                // Wikipedia
+                if let titleName = title.title,
+                   let encodedTitle = titleName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                   let wikiURL = URL(string: "https://en.wikipedia.org/wiki/Special:Search?search=\(encodedTitle)") {
+                    Link(destination: wikiURL) {
+                        LinkButton(icon: "book.closed", label: "Wiki")
                     }
                 }
             }
