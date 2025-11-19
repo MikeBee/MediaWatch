@@ -291,7 +291,7 @@ struct NewListSheet: View {
 // MARK: - List Row View
 
 struct ListRowView: View {
-    let list: MediaList
+    @ObservedObject var list: MediaList
 
     var body: some View {
         HStack {
@@ -594,7 +594,6 @@ struct AddToListSheet: View {
     @State private var isAdding = false
 
     var body: some View {
-        let _ = print("DEBUG: AddToListSheet body rendered, lists.count = \(lists.count)")
         NavigationStack {
             Group {
                 if lists.isEmpty {
@@ -659,22 +658,13 @@ struct AddToListSheet: View {
     }
 
     private func fetchLists() {
-        print("DEBUG: fetchLists called")
-        print("DEBUG: viewContext = \(viewContext)")
-        print("DEBUG: viewContext.persistentStoreCoordinator = \(String(describing: viewContext.persistentStoreCoordinator))")
-
         let request: NSFetchRequest<MediaList> = NSFetchRequest(entityName: "List")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)]
 
         do {
-            let fetchedLists = try viewContext.fetch(request)
-            print("DEBUG: Fetched \(fetchedLists.count) lists")
-            for list in fetchedLists {
-                print("DEBUG: List - \(list.name ?? "nil") id=\(String(describing: list.id))")
-            }
-            lists = fetchedLists
+            lists = try viewContext.fetch(request)
         } catch {
-            print("DEBUG ERROR fetching lists: \(error)")
+            print("Error fetching lists: \(error)")
         }
     }
 
