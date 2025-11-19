@@ -506,6 +506,7 @@ struct SearchView: View {
             .sheet(isPresented: $showingAddToList) {
                 if let result = selectedResult {
                     AddToListSheet(result: result)
+                        .environment(\.managedObjectContext, viewContext)
                 }
             }
         }
