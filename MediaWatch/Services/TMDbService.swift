@@ -160,6 +160,28 @@ actor TMDbService {
         return try await fetch(urlString)
     }
 
+    // MARK: - Credits
+
+    /// Get credits (cast & crew) for a movie
+    func getMovieCredits(id: Int) async throws -> TMDbCreditsResponse {
+        guard let apiKey = apiKey else {
+            throw MediaWatchError.invalidURL
+        }
+
+        let urlString = "\(baseURL)/movie/\(id)/credits?api_key=\(apiKey)"
+        return try await fetch(urlString)
+    }
+
+    /// Get credits (cast & crew) for a TV show
+    func getTVCredits(id: Int) async throws -> TMDbCreditsResponse {
+        guard let apiKey = apiKey else {
+            throw MediaWatchError.invalidURL
+        }
+
+        let urlString = "\(baseURL)/tv/\(id)/credits?api_key=\(apiKey)"
+        return try await fetch(urlString)
+    }
+
     // MARK: - Genres
 
     /// Load genre mappings from TMDb
@@ -212,6 +234,12 @@ actor TMDbService {
 
     /// Generate full image URL for an episode still
     static func stillURL(path: String?, size: String = Constants.TMDb.ImageSize.stillMedium) -> URL? {
+        guard let path = path else { return nil }
+        return URL(string: "\(Constants.TMDb.imageBaseURL)\(size)\(path)")
+    }
+
+    /// Generate full image URL for a profile/cast photo
+    static func profileURL(path: String?, size: String = "w185") -> URL? {
         guard let path = path else { return nil }
         return URL(string: "\(Constants.TMDb.imageBaseURL)\(size)\(path)")
     }
