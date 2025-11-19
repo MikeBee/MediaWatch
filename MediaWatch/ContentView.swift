@@ -878,9 +878,7 @@ struct TitleDetailView: View {
                 ForEach(WatchStatus.allCases, id: \.rawValue) { status in
                     Button {
                         title.watchStatus = status.rawValue
-                        if status == .watched {
-                            title.watchedDate = Date()
-                        }
+                        title.dateModified = Date()
                         try? viewContext.save()
                     } label: {
                         VStack(spacing: 6) {
@@ -1417,24 +1415,26 @@ struct TitleDetailView: View {
     // MARK: - Action Bar
 
     private var actionBar: some View {
-        let currentStatus = WatchStatus(rawValue: title.watchStatus) ?? .notWatched
+        let currentStatus = WatchStatus(rawValue: title.watchStatus) ?? .haventStarted
 
         return HStack(spacing: 0) {
             // Watch Status - cycles through statuses
             Button {
                 let nextStatus: WatchStatus
                 switch currentStatus {
-                case .notWatched:
-                    nextStatus = .watching
-                case .watching:
-                    nextStatus = .watched
-                case .watched:
-                    nextStatus = .notWatched
+                case .current:
+                    nextStatus = .waiting
+                case .waiting:
+                    nextStatus = .new
+                case .new:
+                    nextStatus = .haventStarted
+                case .haventStarted:
+                    nextStatus = .maybe
+                case .maybe:
+                    nextStatus = .current
                 }
                 title.watchStatus = nextStatus.rawValue
-                if nextStatus == .watched {
-                    title.watchedDate = Date()
-                }
+                title.dateModified = Date()
                 try? viewContext.save()
             } label: {
                 VStack(spacing: 4) {
