@@ -3,7 +3,7 @@
     <entity name="Episode" representedClassName="Episode" syncable="YES" codeGenerationType="class">
         <attribute name="airDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="episodeNumber" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="localStillPath" optional="YES" attributeType="String"/>
         <attribute name="name" attributeType="String" defaultValueString=""/>
         <attribute name="overview" optional="YES" attributeType="String"/>
@@ -28,7 +28,7 @@
         <attribute name="dateCreated" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="icon" optional="YES" attributeType="String"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="isDefault" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="name" attributeType="String" defaultValueString=""/>
         <attribute name="sortOrder" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
@@ -36,7 +36,7 @@
     </entity>
     <entity name="ListItem" representedClassName="ListItem" syncable="YES" codeGenerationType="class">
         <attribute name="dateAdded" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="orderIndex" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="list" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="List" inverseName="items" inverseEntity="List"/>
         <relationship name="title" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Title" inverseName="listItems" inverseEntity="Title"/>
@@ -50,7 +50,7 @@
     <entity name="Note" representedClassName="Note" syncable="YES" codeGenerationType="class">
         <attribute name="dateCreated" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="ownerOnly" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="text" attributeType="String" defaultValueString=""/>
         <relationship name="episode" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Episode" inverseName="notes" inverseEntity="Episode"/>
@@ -62,7 +62,7 @@
         <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="firstAirDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="genres" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformerName" customClassName="[String]"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="imdbId" optional="YES" attributeType="String"/>
         <attribute name="lastAirDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="likedStatus" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
@@ -100,7 +100,7 @@
         <attribute name="appVersion" optional="YES" attributeType="String"/>
         <attribute name="defaultLikedStatus" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="defaultListId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="imageQuality" attributeType="String" defaultValueString="w500"/>
         <attribute name="lastSyncDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="showWatchedInLists" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
