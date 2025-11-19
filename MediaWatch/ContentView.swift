@@ -1048,7 +1048,7 @@ struct TitleDetailView: View {
                             try? viewContext.save()
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1080,7 +1080,7 @@ struct TitleDetailView: View {
                             try? viewContext.save()
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
