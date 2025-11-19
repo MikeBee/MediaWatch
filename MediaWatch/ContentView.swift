@@ -112,7 +112,12 @@ struct HomeView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(tvShowsInProgress.prefix(10)) { show in
-                                        ContinueWatchingCard(title: show)
+                                        NavigationLink {
+                                            TitleDetailView(title: show)
+                                        } label: {
+                                            ContinueWatchingCard(title: show)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                                 .padding(.horizontal)
@@ -130,7 +135,12 @@ struct HomeView: View {
 
                             LazyVStack(spacing: 12) {
                                 ForEach(recentlyWatched.prefix(5)) { title in
-                                    RecentlyWatchedRow(title: title)
+                                    NavigationLink {
+                                        TitleDetailView(title: title)
+                                    } label: {
+                                        RecentlyWatchedRow(title: title)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                             .padding(.horizontal)
@@ -424,14 +434,24 @@ struct ListDetailView: View {
                             GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 16)
                         ], spacing: 16) {
                             ForEach(list.sortedTitles, id: \.objectID) { title in
-                                TitleGridItem(title: title)
+                                NavigationLink {
+                                    TitleDetailView(title: title)
+                                } label: {
+                                    TitleGridItem(title: title)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
                     } else {
                         LazyVStack(spacing: 12) {
                             ForEach(list.sortedTitles, id: \.objectID) { title in
-                                TitleListRow(title: title)
+                                NavigationLink {
+                                    TitleDetailView(title: title)
+                                } label: {
+                                    TitleListRow(title: title)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
@@ -557,6 +577,875 @@ struct TitleListRow: View {
         .padding()
         .background(Color(.systemGray6).opacity(0.3))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Title Detail View
+
+struct TitleDetailView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var title: Title
+
+    @State private var showingNotesEditor = false
+    @State private var showingListManager = false
+    @State private var expandedSynopsis = false
+    @State private var expandedSeasons: Set<Int> = []
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // MARK: - Header with Poster
+                headerSection
+
+                // MARK: - Content
+                VStack(alignment: .leading, spacing: 24) {
+                    // Liked Status Toggle
+                    likedStatusSection
+
+                    // Basic Info
+                    basicInfoSection
+
+                    // Synopsis
+                    synopsisSection
+
+                    // Notes
+                    notesSection
+
+                    // Progress Section
+                    progressSection
+
+                    // Lists Section
+                    listsSection
+
+                    // External Links
+                    externalLinksSection
+
+                    Spacer(minLength: 100)
+                }
+                .padding()
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        showingNotesEditor = true
+                    } label: {
+                        Label("Edit Notes", systemImage: "note.text")
+                    }
+                    Button {
+                        showingListManager = true
+                    } label: {
+                        Label("Manage Lists", systemImage: "list.bullet")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showingNotesEditor) {
+            NotesEditorSheet(title: title)
+        }
+        .sheet(isPresented: $showingListManager) {
+            ListManagerSheet(title: title)
+                .environment(\.managedObjectContext, viewContext)
+        }
+        .safeAreaInset(edge: .bottom) {
+            actionBar
+        }
+    }
+
+    // MARK: - Header Section
+
+    private var headerSection: some View {
+        ZStack(alignment: .bottom) {
+            // Backdrop
+            if let backdropPath = title.backdropPath {
+                BackdropImageView(backdropPath: backdropPath, size: Constants.TMDb.ImageSize.backdropLarge)
+                    .frame(height: 250)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 250)
+            }
+
+            // Title Info
+            HStack(alignment: .bottom, spacing: 16) {
+                // Poster
+                PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
+                    .frame(width: 100, height: 150)
+                    .cornerRadius(8)
+                    .shadow(radius: 10)
+
+                // Title and Year
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title.title ?? "Unknown")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .lineLimit(3)
+
+                    if title.year > 0 {
+                        Text("\(title.year)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Type badge
+                    Text(title.mediaType == "movie" ? "Movie" : "TV Show")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.3))
+                        .cornerRadius(4)
+                }
+
+                Spacer()
+            }
+            .padding()
+        }
+    }
+
+    // MARK: - Liked Status Section
+
+    private var likedStatusSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Rating")
+                .font(.headline)
+
+            HStack(spacing: 16) {
+                LikeButton(
+                    icon: "hand.thumbsup.fill",
+                    label: "Liked",
+                    isSelected: title.likedStatus == 1,
+                    color: .green
+                ) {
+                    title.likedStatus = title.likedStatus == 1 ? 0 : 1
+                    try? viewContext.save()
+                }
+
+                LikeButton(
+                    icon: "minus",
+                    label: "Neutral",
+                    isSelected: title.likedStatus == 0,
+                    color: .gray
+                ) {
+                    title.likedStatus = 0
+                    try? viewContext.save()
+                }
+
+                LikeButton(
+                    icon: "hand.thumbsdown.fill",
+                    label: "Disliked",
+                    isSelected: title.likedStatus == -1,
+                    color: .red
+                ) {
+                    title.likedStatus = title.likedStatus == -1 ? 0 : -1
+                    try? viewContext.save()
+                }
+            }
+        }
+    }
+
+    // MARK: - Basic Info Section
+
+    private var basicInfoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Info")
+                .font(.headline)
+
+            VStack(spacing: 8) {
+                // Genres
+                if let genres = title.genres, !genres.isEmpty {
+                    InfoRow(label: "Genres", value: genres.joined(separator: ", "))
+                }
+
+                // Runtime or Seasons
+                if title.mediaType == "movie" {
+                    if title.runtime > 0 {
+                        InfoRow(label: "Runtime", value: "\(title.runtime) min")
+                    }
+                } else {
+                    if title.numberOfSeasons > 0 {
+                        InfoRow(label: "Seasons", value: "\(title.numberOfSeasons)")
+                    }
+                    if title.numberOfEpisodes > 0 {
+                        InfoRow(label: "Episodes", value: "\(title.numberOfEpisodes)")
+                    }
+                }
+
+                // Status
+                if let status = title.status, !status.isEmpty {
+                    InfoRow(label: "Status", value: status)
+                }
+
+                // Last Watched
+                if let watchedDate = title.watchedDate {
+                    InfoRow(label: "Last Watched", value: watchedDate.formatted(date: .abbreviated, time: .omitted))
+                }
+
+                // Vote Average
+                if title.voteAverage > 0 {
+                    HStack {
+                        Text("TMDb Rating")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .foregroundStyle(.yellow)
+                            Text(String(format: "%.1f", title.voteAverage))
+                        }
+                    }
+                    .font(.subheadline)
+                }
+            }
+        }
+    }
+
+    // MARK: - Synopsis Section
+
+    private var synopsisSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Synopsis")
+                .font(.headline)
+
+            if let overview = title.overview, !overview.isEmpty {
+                Text(overview)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(expandedSynopsis ? nil : 4)
+
+                if overview.count > 200 {
+                    Button {
+                        withAnimation {
+                            expandedSynopsis.toggle()
+                        }
+                    } label: {
+                        Text(expandedSynopsis ? "Show Less" : "Read More")
+                            .font(.caption)
+                            .foregroundStyle(.accentColor)
+                    }
+                }
+            } else {
+                Text("No synopsis available")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .italic()
+            }
+        }
+    }
+
+    // MARK: - Notes Section
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("My Notes")
+                    .font(.headline)
+                Spacer()
+                Button("Edit") {
+                    showingNotesEditor = true
+                }
+                .font(.subheadline)
+            }
+
+            let notesArray = (title.notes as? Set<Note>)?.sorted { $0.dateModified ?? Date() > $1.dateModified ?? Date() } ?? []
+
+            if notesArray.isEmpty {
+                Button {
+                    showingNotesEditor = true
+                } label: {
+                    HStack {
+                        Image(systemName: "note.text.badge.plus")
+                        Text("Add a note...")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6).opacity(0.5))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(notesArray.prefix(3), id: \.objectID) { note in
+                        Text(note.text ?? "")
+                            .font(.body)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(.systemGray6).opacity(0.5))
+                            .cornerRadius(8)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Progress Section
+
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Progress")
+                .font(.headline)
+
+            if title.mediaType == "movie" {
+                // Movie: Simple watched toggle
+                movieProgressSection
+            } else {
+                // TV Show: Episode tracking
+                tvShowProgressSection
+            }
+        }
+    }
+
+    private var movieProgressSection: some View {
+        VStack(spacing: 12) {
+            Button {
+                title.watched.toggle()
+                if title.watched {
+                    title.watchedDate = Date()
+                }
+                try? viewContext.save()
+            } label: {
+                HStack {
+                    Image(systemName: title.watched ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                    Text(title.watched ? "Watched" : "Mark as Watched")
+                        .font(.headline)
+                    Spacer()
+                    if title.watched, let date = title.watchedDate {
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+                .background(title.watched ? Color.green.opacity(0.2) : Color(.systemGray6).opacity(0.5))
+                .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(title.watched ? .green : .primary)
+        }
+    }
+
+    private var tvShowProgressSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Episode count
+            let episodes = (title.episodes as? Set<Episode>) ?? []
+            let watchedCount = episodes.filter { $0.watched }.count
+            let totalCount = episodes.count
+
+            if totalCount > 0 {
+                HStack {
+                    Text("\(watchedCount) of \(totalCount) episodes watched")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int(Double(watchedCount) / Double(totalCount) * 100))%")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                }
+
+                // Progress bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 4)
+                            .cornerRadius(2)
+
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(width: geometry.size.width * CGFloat(watchedCount) / CGFloat(totalCount), height: 4)
+                            .cornerRadius(2)
+                    }
+                }
+                .frame(height: 4)
+            }
+
+            // Seasons list
+            let seasons = Dictionary(grouping: episodes) { $0.seasonNumber }
+                .sorted { $0.key < $1.key }
+
+            if !seasons.isEmpty {
+                ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
+                    SeasonSection(
+                        seasonNumber: Int(seasonNumber),
+                        episodes: seasonEpisodes.sorted { $0.episodeNumber < $1.episodeNumber },
+                        isExpanded: expandedSeasons.contains(Int(seasonNumber))
+                    ) {
+                        if expandedSeasons.contains(Int(seasonNumber)) {
+                            expandedSeasons.remove(Int(seasonNumber))
+                        } else {
+                            expandedSeasons.insert(Int(seasonNumber))
+                        }
+                    }
+                }
+            } else {
+                Text("No episodes loaded yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .italic()
+            }
+        }
+    }
+
+    // MARK: - Lists Section
+
+    private var listsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("In Lists")
+                    .font(.headline)
+                Spacer()
+                Button("Manage") {
+                    showingListManager = true
+                }
+                .font(.subheadline)
+            }
+
+            let listItems = (title.listItems as? Set<ListItem>) ?? []
+            let lists = listItems.compactMap { $0.list }
+
+            if lists.isEmpty {
+                Text("Not in any list")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .italic()
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(lists, id: \.objectID) { list in
+                        HStack(spacing: 4) {
+                            Image(systemName: list.displayIcon)
+                                .foregroundStyle(list.displayColor)
+                            Text(list.displayName)
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray6).opacity(0.5))
+                        .cornerRadius(16)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - External Links Section
+
+    private var externalLinksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("External Links")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                // TMDb
+                Link(destination: URL(string: "https://www.themoviedb.org/\(title.mediaType ?? "movie")/\(title.tmdbId)")!) {
+                    LinkButton(icon: "film", label: "TMDb")
+                }
+
+                // IMDb
+                if let imdbId = title.imdbId, !imdbId.isEmpty {
+                    Link(destination: URL(string: "https://www.imdb.com/title/\(imdbId)")!) {
+                        LinkButton(icon: "star", label: "IMDb")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Action Bar
+
+    private var actionBar: some View {
+        HStack(spacing: 16) {
+            // Mark Watched / Next Episode
+            Button {
+                if title.mediaType == "movie" {
+                    title.watched.toggle()
+                    if title.watched {
+                        title.watchedDate = Date()
+                    }
+                    try? viewContext.save()
+                }
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
+                        .font(.title2)
+                    Text(title.mediaType == "movie" ? "Watched" : "Progress")
+                        .font(.caption2)
+                }
+            }
+            .foregroundStyle(title.watched ? .green : .primary)
+
+            Spacer()
+
+            // Lists
+            Button {
+                showingListManager = true
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: "list.bullet")
+                        .font(.title2)
+                    Text("Lists")
+                        .font(.caption2)
+                }
+            }
+
+            Spacer()
+
+            // Notes
+            Button {
+                showingNotesEditor = true
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: "note.text")
+                        .font(.title2)
+                    Text("Notes")
+                        .font(.caption2)
+                }
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+    }
+}
+
+// MARK: - Supporting Views
+
+struct LikeButton: View {
+    let icon: String
+    let label: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.title2)
+                Text(label)
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(isSelected ? color.opacity(0.2) : Color(.systemGray6).opacity(0.5))
+            .foregroundStyle(isSelected ? color : .secondary)
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct InfoRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+        }
+        .font(.subheadline)
+    }
+}
+
+struct LinkButton: View {
+    let icon: String
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.title3)
+            Text(label)
+                .font(.caption)
+        }
+        .frame(width: 60, height: 50)
+        .background(Color(.systemGray6).opacity(0.5))
+        .cornerRadius(8)
+    }
+}
+
+struct SeasonSection: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    let seasonNumber: Int
+    let episodes: [Episode]
+    let isExpanded: Bool
+    let onToggle: () -> Void
+
+    var watchedCount: Int {
+        episodes.filter { $0.watched }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Season header
+            Button(action: onToggle) {
+                HStack {
+                    Text("Season \(seasonNumber)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Spacer()
+
+                    Text("\(watchedCount)/\(episodes.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+                .background(Color(.systemGray6).opacity(0.3))
+                .cornerRadius(isExpanded ? 8 : 8)
+            }
+            .buttonStyle(.plain)
+
+            // Episodes
+            if isExpanded {
+                VStack(spacing: 1) {
+                    ForEach(episodes, id: \.objectID) { episode in
+                        EpisodeRow(episode: episode)
+                    }
+                }
+                .background(Color(.systemGray6).opacity(0.2))
+                .cornerRadius(8)
+                .padding(.top, 1)
+            }
+        }
+    }
+}
+
+struct EpisodeRow: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @ObservedObject var episode: Episode
+
+    var body: some View {
+        HStack {
+            Button {
+                episode.watched.toggle()
+                if episode.watched {
+                    episode.watchedDate = Date()
+                }
+                try? viewContext.save()
+            } label: {
+                Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(episode.watched ? .green : .secondary)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("E\(episode.episodeNumber) • \(episode.name ?? "Episode")")
+                    .font(.subheadline)
+                    .lineLimit(1)
+
+                if let airDate = episode.airDate {
+                    Text(airDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if episode.runtime > 0 {
+                Text("\(episode.runtime)m")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Flow Layout
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
+                                      y: bounds.minY + result.positions[index].y),
+                         proposal: .unspecified)
+        }
+    }
+
+    struct FlowResult {
+        var size: CGSize = .zero
+        var positions: [CGPoint] = []
+
+        init(in width: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var rowHeight: CGFloat = 0
+
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+
+                if x + size.width > width && x > 0 {
+                    x = 0
+                    y += rowHeight + spacing
+                    rowHeight = 0
+                }
+
+                positions.append(CGPoint(x: x, y: y))
+                rowHeight = max(rowHeight, size.height)
+                x += size.width + spacing
+            }
+
+            self.size = CGSize(width: width, height: y + rowHeight)
+        }
+    }
+}
+
+// MARK: - Notes Editor Sheet
+
+struct NotesEditorSheet: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var title: Title
+
+    @State private var noteText = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Note") {
+                    TextEditor(text: $noteText)
+                        .frame(minHeight: 200)
+                }
+            }
+            .navigationTitle("Edit Notes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveNote()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                // Load existing note
+                if let notes = title.notes as? Set<Note>,
+                   let firstNote = notes.first {
+                    noteText = firstNote.text ?? ""
+                }
+            }
+        }
+    }
+
+    private func saveNote() {
+        // Update or create note
+        if let notes = title.notes as? Set<Note>,
+           let existingNote = notes.first {
+            existingNote.text = noteText
+            existingNote.dateModified = Date()
+        } else if !noteText.isEmpty {
+            _ = TMDbMapper.createNote(text: noteText, for: title, context: viewContext)
+        }
+
+        try? viewContext.save()
+    }
+}
+
+// MARK: - List Manager Sheet
+
+struct ListManagerSheet: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var title: Title
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        animation: .default
+    )
+    private var allLists: FetchedResults<MediaList>
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(allLists) { list in
+                    let isInList = titleIsInList(list)
+
+                    Button {
+                        toggleList(list)
+                    } label: {
+                        HStack {
+                            Image(systemName: list.displayIcon)
+                                .foregroundStyle(list.displayColor)
+                                .frame(width: 30)
+
+                            Text(list.displayName)
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            if isInList {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.accentColor)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Manage Lists")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func titleIsInList(_ list: MediaList) -> Bool {
+        guard let listItems = title.listItems as? Set<ListItem> else { return false }
+        return listItems.contains { $0.list?.objectID == list.objectID }
+    }
+
+    private func toggleList(_ list: MediaList) {
+        if titleIsInList(list) {
+            // Remove from list
+            if let listItems = title.listItems as? Set<ListItem>,
+               let item = listItems.first(where: { $0.list?.objectID == list.objectID }) {
+                viewContext.delete(item)
+            }
+        } else {
+            // Add to list
+            _ = TMDbMapper.addTitle(title, to: list, context: viewContext)
+        }
+
+        try? viewContext.save()
     }
 }
 
