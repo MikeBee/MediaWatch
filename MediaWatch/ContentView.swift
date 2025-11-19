@@ -454,7 +454,6 @@ struct SearchView: View {
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var selectedResult: TMDbSearchResult?
-    @State private var showingAddToList = false
 
     var body: some View {
         NavigationStack {
@@ -482,12 +481,12 @@ struct SearchView: View {
                 } else {
                     List {
                         ForEach(searchResults) { result in
-                            SearchResultRow(result: result)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    selectedResult = result
-                                    showingAddToList = true
-                                }
+                            Button {
+                                selectedResult = result
+                            } label: {
+                                SearchResultRow(result: result)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -503,11 +502,9 @@ struct SearchView: View {
                     errorMessage = nil
                 }
             }
-            .sheet(isPresented: $showingAddToList) {
-                if let result = selectedResult {
-                    AddToListSheet(result: result)
-                        .environment(\.managedObjectContext, viewContext)
-                }
+            .sheet(item: $selectedResult) { result in
+                AddToListSheet(result: result)
+                    .environment(\.managedObjectContext, viewContext)
             }
         }
     }
@@ -597,6 +594,7 @@ struct AddToListSheet: View {
     @State private var isAdding = false
 
     var body: some View {
+        let _ = print("DEBUG: AddToListSheet body rendered, lists.count = \(lists.count)")
         NavigationStack {
             Group {
                 if lists.isEmpty {
