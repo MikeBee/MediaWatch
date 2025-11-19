@@ -243,7 +243,7 @@ struct NewListSheet: View {
                                 color = hexColor
                             } label: {
                                 Circle()
-                                    .fill(Color(hex: hexColor) ?? .accentColor)
+                                    .fill(Color(hex: hexColor) ?? Color.accentColor)
                                     .frame(width: 36, height: 36)
                                     .overlay {
                                         if color == hexColor {
