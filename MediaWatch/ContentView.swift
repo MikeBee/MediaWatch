@@ -623,34 +623,25 @@ struct TitleDetailView: View {
 
                     Spacer(minLength: 100)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
             }
         }
+        .frame(maxWidth: .infinity)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    if title.mediaType == "movie" {
-                        Button {
-                            title.watched.toggle()
-                            if title.watched {
-                                title.watchedDate = Date()
-                            }
-                            try? viewContext.save()
-                        } label: {
-                            Label(title.watched ? "Mark Unwatched" : "Mark Watched",
-                                  systemImage: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
-                        }
+                    Button {
+                        showingNotesEditor = true
+                    } label: {
+                        Label("Edit Notes", systemImage: "note.text")
                     }
                     Button {
                         showingListManager = true
                     } label: {
                         Label("Manage Lists", systemImage: "list.bullet")
-                    }
-                    Button {
-                        showingNotesEditor = true
-                    } label: {
-                        Label("Edit Notes", systemImage: "note.text")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -663,6 +654,9 @@ struct TitleDetailView: View {
         .sheet(isPresented: $showingListManager) {
             ListManagerSheet(title: title)
                 .environment(\.managedObjectContext, viewContext)
+        }
+        .safeAreaInset(edge: .bottom) {
+            actionBar
         }
     }
 
@@ -949,62 +943,83 @@ struct TitleDetailView: View {
 
     private var tvShowProgressSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Episode count
-            let episodes = (title.episodes as? Set<Episode>) ?? []
-            let watchedCount = episodes.filter { $0.watched }.count
-            let totalCount = episodes.count
-
-            if totalCount > 0 {
-                HStack {
-                    Text("\(watchedCount) of \(totalCount) episodes watched")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(Int(Double(watchedCount) / Double(totalCount) * 100))%")
+            // Current progress inputs
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Season")
                         .font(.caption)
-                        .fontWeight(.bold)
-                }
-
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 4)
-                            .cornerRadius(2)
-
-                        Rectangle()
-                            .fill(Color.accentColor)
-                            .frame(width: geometry.size.width * CGFloat(watchedCount) / CGFloat(totalCount), height: 4)
-                            .cornerRadius(2)
-                    }
-                }
-                .frame(height: 4)
-            }
-
-            // Seasons list
-            let seasons = Dictionary(grouping: episodes) { $0.seasonNumber }
-                .sorted { $0.key < $1.key }
-
-            if !seasons.isEmpty {
-                ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
-                    SeasonSection(
-                        seasonNumber: Int(seasonNumber),
-                        episodes: seasonEpisodes.sorted { $0.episodeNumber < $1.episodeNumber },
-                        isExpanded: expandedSeasons.contains(Int(seasonNumber))
-                    ) {
-                        if expandedSeasons.contains(Int(seasonNumber)) {
-                            expandedSeasons.remove(Int(seasonNumber))
-                        } else {
-                            expandedSeasons.insert(Int(seasonNumber))
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            if title.currentSeason > 1 {
+                                title.currentSeason -= 1
+                                try? viewContext.save()
+                            }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.secondary)
                         }
+                        .buttonStyle(.plain)
+
+                        Text("\(title.currentSeason)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .frame(minWidth: 30)
+
+                        Button {
+                            title.currentSeason += 1
+                            try? viewContext.save()
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.accentColor)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-            } else {
-                Text("No episodes loaded yet")
-                    .font(.subheadline)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Episode")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            if title.currentEpisode > 1 {
+                                title.currentEpisode -= 1
+                                try? viewContext.save()
+                            }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text("\(title.currentEpisode)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .frame(minWidth: 30)
+
+                        Button {
+                            title.currentEpisode += 1
+                            try? viewContext.save()
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding()
+            .background(Color(.systemGray6).opacity(0.5))
+            .cornerRadius(12)
+
+            // Show total seasons if known
+            if title.numberOfSeasons > 0 {
+                Text("Total: \(title.numberOfSeasons) seasons")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .italic()
             }
         }
     }
@@ -1071,6 +1086,60 @@ struct TitleDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Action Bar
+
+    private var actionBar: some View {
+        HStack(spacing: 0) {
+            // Progress / Watched
+            Button {
+                if title.mediaType == "movie" {
+                    title.watched.toggle()
+                    if title.watched {
+                        title.watchedDate = Date()
+                    }
+                    try? viewContext.save()
+                }
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
+                        .font(.title3)
+                    Text(title.mediaType == "movie" ? "Watched" : "Progress")
+                        .font(.caption2)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .foregroundStyle(title.watched ? .green : .primary)
+
+            // Lists
+            Button {
+                showingListManager = true
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: "list.bullet")
+                        .font(.title3)
+                    Text("Lists")
+                        .font(.caption2)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            // Notes
+            Button {
+                showingNotesEditor = true
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: "note.text")
+                        .font(.title3)
+                    Text("Notes")
+                        .font(.caption2)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
     }
 }
 
