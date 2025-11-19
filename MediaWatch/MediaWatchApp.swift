@@ -2,19 +2,25 @@
 //  MediaWatchApp.swift
 //  MediaWatch
 //
-//  Created by Mike on 11/19/25.
+//  Main app entry point
 //
 
 import SwiftUI
 
 @main
 struct MediaWatchApp: App {
-    let persistenceController = PersistenceController.shared
+
+    // MARK: - Properties
+
+    @StateObject private var persistenceController = PersistenceController.shared
+
+    // MARK: - Body
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, persistenceController.viewContext)
+                .environmentObject(persistenceController)
         }
     }
 }
