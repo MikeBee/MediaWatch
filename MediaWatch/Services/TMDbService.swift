@@ -138,6 +138,28 @@ actor TMDbService {
         return try await fetch(urlString)
     }
 
+    // MARK: - Watch Providers
+
+    /// Get watch providers for a movie
+    func getMovieWatchProviders(id: Int) async throws -> TMDbWatchProvidersResponse {
+        guard let apiKey = apiKey else {
+            throw MediaWatchError.invalidURL
+        }
+
+        let urlString = "\(baseURL)/movie/\(id)/watch/providers?api_key=\(apiKey)"
+        return try await fetch(urlString)
+    }
+
+    /// Get watch providers for a TV show
+    func getTVWatchProviders(id: Int) async throws -> TMDbWatchProvidersResponse {
+        guard let apiKey = apiKey else {
+            throw MediaWatchError.invalidURL
+        }
+
+        let urlString = "\(baseURL)/tv/\(id)/watch/providers?api_key=\(apiKey)"
+        return try await fetch(urlString)
+    }
+
     // MARK: - Genres
 
     /// Load genre mappings from TMDb

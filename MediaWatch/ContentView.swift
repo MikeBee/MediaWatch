@@ -115,6 +115,50 @@ enum WatchStatus: Int16, CaseIterable {
     }
 }
 
+// MARK: - Title Extension for Next Episode
+
+extension Title {
+    /// Returns the next unwatched episode (first by season, then by episode number)
+    var nextUnwatchedEpisode: (season: Int16, episode: Int16)? {
+        guard let episodes = episodes as? Set<Episode>, !episodes.isEmpty else {
+            return nil
+        }
+
+        // Sort episodes by season then episode number
+        let sortedEpisodes = episodes.sorted { first, second in
+            if first.seasonNumber != second.seasonNumber {
+                return first.seasonNumber < second.seasonNumber
+            }
+            return first.episodeNumber < second.episodeNumber
+        }
+
+        // Find first unwatched episode
+        if let nextEpisode = sortedEpisodes.first(where: { !$0.watched }) {
+            return (nextEpisode.seasonNumber, nextEpisode.episodeNumber)
+        }
+
+        // All episodes watched - return nil or last episode
+        return nil
+    }
+
+    /// Display string for next episode badge
+    var nextEpisodeBadge: String {
+        if let next = nextUnwatchedEpisode {
+            return "S\(next.season) E\(next.episode)"
+        }
+        // Fallback to current tracking values if no episodes loaded
+        return "S\(currentSeason) E\(currentEpisode)"
+    }
+
+    /// Get the streaming service enum value
+    var streamingServiceEnum: StreamingService {
+        guard let serviceName = streamingService, !serviceName.isEmpty else {
+            return .none
+        }
+        return StreamingService(rawValue: serviceName) ?? .other
+    }
+}
+
 // MARK: - Home View (Dashboard)
 
 struct HomeView: View {
@@ -281,16 +325,36 @@ struct ContinueWatchingCard: View {
                     .frame(width: 120, height: 180)
                     .cornerRadius(8)
 
-                // Season/Episode badge for TV shows
-                if title.mediaType == "tv" {
-                    Text("S\(title.currentSeason) E\(title.currentEpisode)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(4)
-                        .padding(6)
+                VStack {
+                    // Streaming service badge at top
+                    if title.streamingServiceEnum != .none {
+                        HStack {
+                            Spacer()
+                            Text(title.streamingServiceEnum.displayName)
+                                .font(.system(size: 8, weight: .bold))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: title.streamingServiceEnum.color))
+                                .foregroundStyle(.white)
+                                .cornerRadius(3)
+                                .padding(4)
+                        }
+                    }
+                    Spacer()
+                    // Season/Episode badge for TV shows - next unwatched
+                    if title.mediaType == "tv" {
+                        HStack {
+                            Text(title.nextEpisodeBadge)
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(4)
+                                .padding(6)
+                            Spacer()
+                        }
+                    }
                 }
             }
 
@@ -605,10 +669,21 @@ struct TitleGridItem: View {
                     .aspectRatio(2/3, contentMode: .fit)
                     .cornerRadius(8)
 
-                // Watch status icon
                 VStack {
                     HStack {
+                        // Streaming service badge at top left
+                        if title.streamingServiceEnum != .none {
+                            Text(title.streamingServiceEnum.displayName)
+                                .font(.system(size: 7, weight: .bold))
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: title.streamingServiceEnum.color))
+                                .foregroundStyle(.white)
+                                .cornerRadius(3)
+                                .padding(4)
+                        }
                         Spacer()
+                        // Watch status icon at top right
                         let status = WatchStatus(rawValue: title.watchStatus) ?? .haventStarted
                         Image(systemName: status.icon)
                             .font(.caption)
@@ -618,14 +693,10 @@ struct TitleGridItem: View {
                             .padding(4)
                     }
                     Spacer()
-                }
-
-                // Season/Episode badge for TV shows
-                if title.mediaType == "tv" {
-                    VStack {
-                        Spacer()
+                    // Season/Episode badge for TV shows - next unwatched
+                    if title.mediaType == "tv" {
                         HStack {
-                            Text("S\(title.currentSeason) E\(title.currentEpisode)")
+                            Text(title.nextEpisodeBadge)
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .padding(.horizontal, 6)
@@ -670,17 +741,26 @@ struct TitleListRow: View {
                         Text("•")
                         Text("\(title.year)")
                     }
-                    // Show season/episode for TV shows
+                    // Show next unwatched episode for TV shows
                     if title.mediaType == "tv" {
                         Text("•")
-                        Text("S\(title.currentSeason) E\(title.currentEpisode)")
+                        Text(title.nextEpisodeBadge)
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                // Liked status
+                // Streaming service and liked status
                 HStack(spacing: 4) {
+                    if title.streamingServiceEnum != .none {
+                        Text(title.streamingServiceEnum.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color(hex: title.streamingServiceEnum.color))
+                            .foregroundStyle(.white)
+                            .cornerRadius(3)
+                    }
                     if title.likedStatus == 1 {
                         Image(systemName: "hand.thumbsup.fill")
                             .foregroundStyle(.green)
@@ -729,6 +809,9 @@ struct TitleDetailView: View {
     @State private var episodeLoadError: String?
     @State private var showingDeleteConfirmation = false
     @State private var episodeRefreshTrigger = false
+    @State private var availableProviders: [TMDbWatchProvider] = []
+    @State private var isLoadingProviders = false
+    @State private var showingStreamingPicker = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -748,6 +831,9 @@ struct TitleDetailView: View {
 
                         // Basic Info
                         basicInfoSection
+
+                        // Streaming Service
+                        streamingServiceSection
 
                         // Synopsis
                         synopsisSection
@@ -1003,6 +1089,132 @@ struct TitleDetailView: View {
                     .font(.subheadline)
                 }
             }
+        }
+    }
+
+    // MARK: - Streaming Service Section
+
+    private var streamingServiceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Where to Watch")
+                .font(.headline)
+
+            HStack {
+                // Current streaming service
+                Button {
+                    showingStreamingPicker = true
+                } label: {
+                    HStack {
+                        let service = title.streamingServiceEnum
+                        if service != .none {
+                            Text(service.displayName)
+                                .font(.subheadline)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: service.color))
+                                .foregroundStyle(.white)
+                                .cornerRadius(6)
+                        } else {
+                            Label("Select Service", systemImage: "tv")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            // TMDb providers
+            if !availableProviders.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Available on")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(availableProviders) { provider in
+                                Button {
+                                    let service = StreamingService.from(tmdbName: provider.providerName)
+                                    title.streamingService = service.rawValue
+                                    try? viewContext.save()
+                                } label: {
+                                    Text(provider.providerName)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color(.systemGray5))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            } else if isLoadingProviders {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading providers...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .sheet(isPresented: $showingStreamingPicker) {
+            StreamingServicePicker(selectedService: Binding(
+                get: { title.streamingService ?? "" },
+                set: { newValue in
+                    title.streamingService = newValue
+                    try? viewContext.save()
+                }
+            ))
+        }
+        .task {
+            await loadWatchProviders()
+        }
+    }
+
+    private func loadWatchProviders() async {
+        isLoadingProviders = true
+        do {
+            let response: TMDbWatchProvidersResponse
+            if title.mediaType == "movie" {
+                response = try await TMDbService.shared.getMovieWatchProviders(id: Int(title.tmdbId))
+            } else {
+                response = try await TMDbService.shared.getTVWatchProviders(id: Int(title.tmdbId))
+            }
+
+            // Get US providers (or first available region)
+            if let usProviders = response.results["US"] {
+                var providers: [TMDbWatchProvider] = []
+                if let flatrate = usProviders.flatrate {
+                    providers.append(contentsOf: flatrate)
+                }
+                if let free = usProviders.free {
+                    providers.append(contentsOf: free)
+                }
+                if let ads = usProviders.ads {
+                    providers.append(contentsOf: ads)
+                }
+                // Remove duplicates by provider ID
+                var seen = Set<Int>()
+                providers = providers.filter { seen.insert($0.providerId).inserted }
+                // Sort by priority
+                providers.sort { $0.displayPriority < $1.displayPriority }
+                await MainActor.run {
+                    availableProviders = providers
+                }
+            }
+        } catch {
+            // Silently fail - providers are optional
+            print("Failed to load watch providers: \(error)")
+        }
+        await MainActor.run {
+            isLoadingProviders = false
         }
     }
 
@@ -2813,6 +3025,84 @@ struct CircularProgressView: View {
             Text("\(Int(progress * 100))%")
                 .font(.system(size: 8))
         }
+    }
+}
+
+// MARK: - Streaming Service Picker
+
+struct StreamingServicePicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedService: String
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(StreamingService.allCases) { service in
+                    Button {
+                        selectedService = service.rawValue
+                        dismiss()
+                    } label: {
+                        HStack {
+                            if service != .none {
+                                Text(service.displayName)
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color(hex: service.color))
+                                    .foregroundStyle(.white)
+                                    .cornerRadius(6)
+                            } else {
+                                Text("None")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if selectedService == service.rawValue {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .navigationTitle("Select Service")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Color Extension
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 

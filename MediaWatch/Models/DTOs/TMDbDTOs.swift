@@ -462,3 +462,101 @@ struct TMDbImageConfiguration: Codable {
         case stillSizes = "still_sizes"
     }
 }
+
+// MARK: - Watch Providers
+
+struct TMDbWatchProvidersResponse: Codable {
+    let id: Int
+    let results: [String: TMDbWatchProviderRegion]
+}
+
+struct TMDbWatchProviderRegion: Codable {
+    let link: String?
+    let flatrate: [TMDbWatchProvider]?
+    let rent: [TMDbWatchProvider]?
+    let buy: [TMDbWatchProvider]?
+    let ads: [TMDbWatchProvider]?
+    let free: [TMDbWatchProvider]?
+}
+
+struct TMDbWatchProvider: Codable, Identifiable {
+    let providerId: Int
+    let providerName: String
+    let logoPath: String?
+    let displayPriority: Int
+
+    var id: Int { providerId }
+
+    enum CodingKeys: String, CodingKey {
+        case providerId = "provider_id"
+        case providerName = "provider_name"
+        case logoPath = "logo_path"
+        case displayPriority = "display_priority"
+    }
+}
+
+// MARK: - Streaming Service
+
+enum StreamingService: String, CaseIterable, Identifiable {
+    case none = ""
+    case netflix = "Netflix"
+    case amazonPrime = "Amazon Prime Video"
+    case disneyPlus = "Disney+"
+    case hulu = "Hulu"
+    case appleTV = "Apple TV+"
+    case hboMax = "Max"
+    case paramount = "Paramount+"
+    case peacock = "Peacock"
+    case other = "Other"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        if self == .none { return "Not Set" }
+        return rawValue
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "tv"
+        case .netflix: return "play.tv"
+        case .amazonPrime: return "play.tv"
+        case .disneyPlus: return "sparkles.tv"
+        case .hulu: return "play.tv"
+        case .appleTV: return "appletv"
+        case .hboMax: return "play.tv"
+        case .paramount: return "play.tv"
+        case .peacock: return "play.tv"
+        case .other: return "tv"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .none: return "666666"
+        case .netflix: return "E50914"
+        case .amazonPrime: return "00A8E1"
+        case .disneyPlus: return "113CCF"
+        case .hulu: return "1CE783"
+        case .appleTV: return "000000"
+        case .hboMax: return "5822B4"
+        case .paramount: return "0064FF"
+        case .peacock: return "000000"
+        case .other: return "666666"
+        }
+    }
+
+    // Map TMDb provider names to our enum
+    static func from(tmdbName: String) -> StreamingService {
+        let lowercased = tmdbName.lowercased()
+        if lowercased.contains("netflix") { return .netflix }
+        if lowercased.contains("amazon") || lowercased.contains("prime video") { return .amazonPrime }
+        if lowercased.contains("disney") { return .disneyPlus }
+        if lowercased.contains("hulu") { return .hulu }
+        if lowercased.contains("apple") { return .appleTV }
+        if lowercased.contains("hbo") || lowercased.contains("max") { return .hboMax }
+        if lowercased.contains("paramount") { return .paramount }
+        if lowercased.contains("peacock") { return .peacock }
+        return .other
+    }
+}
