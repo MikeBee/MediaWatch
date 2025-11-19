@@ -22,15 +22,26 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                // iPad layout
-                iPadView
-            } else {
-                // iPhone layout
-                iPhoneView
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                colors: [Color.black, Color(white: 0.15)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            Group {
+                if horizontalSizeClass == .regular {
+                    // iPad layout
+                    iPadView
+                } else {
+                    // iPhone layout
+                    iPhoneView
+                }
             }
         }
+        .preferredColorScheme(.dark)
         .onAppear {
             // Set up TMDb API key
             Task {
