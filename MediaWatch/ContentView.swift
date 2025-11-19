@@ -630,15 +630,27 @@ struct TitleDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button {
-                        showingNotesEditor = true
-                    } label: {
-                        Label("Edit Notes", systemImage: "note.text")
+                    if title.mediaType == "movie" {
+                        Button {
+                            title.watched.toggle()
+                            if title.watched {
+                                title.watchedDate = Date()
+                            }
+                            try? viewContext.save()
+                        } label: {
+                            Label(title.watched ? "Mark Unwatched" : "Mark Watched",
+                                  systemImage: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
+                        }
                     }
                     Button {
                         showingListManager = true
                     } label: {
                         Label("Manage Lists", systemImage: "list.bullet")
+                    }
+                    Button {
+                        showingNotesEditor = true
+                    } label: {
+                        Label("Edit Notes", systemImage: "note.text")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -651,9 +663,6 @@ struct TitleDetailView: View {
         .sheet(isPresented: $showingListManager) {
             ListManagerSheet(title: title)
                 .environment(\.managedObjectContext, viewContext)
-        }
-        .safeAreaInset(edge: .bottom) {
-            actionBar
         }
     }
 
@@ -1063,61 +1072,6 @@ struct TitleDetailView: View {
             }
         }
     }
-
-    // MARK: - Action Bar
-
-    private var actionBar: some View {
-        HStack(spacing: 16) {
-            // Mark Watched / Next Episode
-            Button {
-                if title.mediaType == "movie" {
-                    title.watched.toggle()
-                    if title.watched {
-                        title.watchedDate = Date()
-                    }
-                    try? viewContext.save()
-                }
-            } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
-                        .font(.title2)
-                    Text(title.mediaType == "movie" ? "Watched" : "Progress")
-                        .font(.caption2)
-                }
-            }
-            .foregroundStyle(title.watched ? .green : .primary)
-
-            Spacer()
-
-            // Lists
-            Button {
-                showingListManager = true
-            } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: "list.bullet")
-                        .font(.title2)
-                    Text("Lists")
-                        .font(.caption2)
-                }
-            }
-
-            Spacer()
-
-            // Notes
-            Button {
-                showingNotesEditor = true
-            } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: "note.text")
-                        .font(.title2)
-                    Text("Notes")
-                        .font(.caption2)
-                }
-            }
-        }
-        .padding()
-        .background(.ultraThinMaterial)
-    }
 }
 
 // MARK: - Supporting Views
@@ -1152,11 +1106,13 @@ struct InfoRow: View {
     let value: String
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             Text(label)
                 .foregroundStyle(.secondary)
-            Spacer()
+                .frame(width: 80, alignment: .leading)
             Text(value)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .font(.subheadline)
     }
