@@ -832,7 +832,7 @@ struct TitleDetailView: View {
                     } label: {
                         Text(expandedSynopsis ? "Show Less" : "Read More")
                             .font(.caption)
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
             } else {
@@ -1410,7 +1410,7 @@ struct ListManagerSheet: View {
 
                             if isInList {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                             }
                         }
                     }
@@ -1732,7 +1732,7 @@ struct SearchResultDetailView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
             }
@@ -1859,7 +1859,7 @@ struct SearchResultDetailView: View {
                     } label: {
                         Text(expandedSynopsis ? "Show Less" : "Read More")
                             .font(.caption)
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
             } else {
