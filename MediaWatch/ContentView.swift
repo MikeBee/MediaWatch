@@ -573,7 +573,7 @@ struct SearchResultRow: View {
 
             Image(systemName: "plus.circle")
                 .font(.title2)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(Color.accentColor)
         }
         .padding(.vertical, 4)
     }
