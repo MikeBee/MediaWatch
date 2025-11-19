@@ -1553,7 +1553,7 @@ struct SearchView: View {
                 }
             }
             .sheet(item: $selectedResult) { result in
-                AddToListSheet(result: result)
+                SearchResultDetailView(result: result)
                     .environment(\.managedObjectContext, viewContext)
             }
             .task {
@@ -1676,6 +1676,228 @@ struct SearchResultRow: View {
         .padding()
         .background(Color(.systemGray6).opacity(0.3))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Search Result Detail View
+
+struct SearchResultDetailView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+
+    let result: TMDbSearchResult
+
+    @State private var showingAddToList = false
+    @State private var expandedSynopsis = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Header with backdrop/poster
+                    headerSection
+
+                    // Content
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Basic Info
+                        infoSection
+
+                        // Synopsis
+                        synopsisSection
+
+                        // TMDb Rating
+                        if let voteAverage = result.voteAverage, voteAverage > 0 {
+                            ratingSection(voteAverage: voteAverage)
+                        }
+
+                        Spacer(minLength: 100)
+                    }
+                    .padding()
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        showingAddToList = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.accentColor)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddToList) {
+                AddToListSheet(result: result)
+                    .environment(\.managedObjectContext, viewContext)
+            }
+        }
+    }
+
+    // MARK: - Header Section
+
+    private var headerSection: some View {
+        ZStack(alignment: .bottom) {
+            // Backdrop
+            if let backdropPath = result.backdropPath {
+                BackdropImageView(backdropPath: backdropPath, size: Constants.TMDb.ImageSize.backdropLarge)
+                    .frame(height: 220)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 220)
+            }
+
+            // Title Info
+            HStack(alignment: .bottom, spacing: 16) {
+                // Poster
+                PosterImageView(posterPath: result.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
+                    .frame(width: 100, height: 150)
+                    .cornerRadius(8)
+                    .shadow(radius: 10)
+
+                // Title and Year
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(result.displayTitle)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .lineLimit(3)
+
+                    if let date = result.displayDate, date.count >= 4 {
+                        Text(String(date.prefix(4)))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Type badge
+                    Text(result.resolvedMediaType == "movie" ? "Movie" : "TV Show")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.3))
+                        .cornerRadius(4)
+                }
+
+                Spacer()
+            }
+            .padding()
+        }
+    }
+
+    // MARK: - Info Section
+
+    private var infoSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Info")
+                .font(.headline)
+
+            HStack {
+                Text("Type")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(result.resolvedMediaType == "movie" ? "Movie" : "TV Show")
+            }
+            .font(.subheadline)
+
+            if let date = result.displayDate {
+                HStack {
+                    Text(result.resolvedMediaType == "movie" ? "Release Date" : "First Aired")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(date)
+                }
+                .font(.subheadline)
+            }
+
+            if let language = result.originalLanguage {
+                HStack {
+                    Text("Language")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(language.uppercased())
+                }
+                .font(.subheadline)
+            }
+        }
+    }
+
+    // MARK: - Synopsis Section
+
+    private var synopsisSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Synopsis")
+                .font(.headline)
+
+            if let overview = result.overview, !overview.isEmpty {
+                Text(overview)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(expandedSynopsis ? nil : 5)
+
+                if overview.count > 200 {
+                    Button {
+                        withAnimation {
+                            expandedSynopsis.toggle()
+                        }
+                    } label: {
+                        Text(expandedSynopsis ? "Show Less" : "Read More")
+                            .font(.caption)
+                            .foregroundStyle(.accentColor)
+                    }
+                }
+            } else {
+                Text("No synopsis available")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .italic()
+            }
+        }
+    }
+
+    // MARK: - Rating Section
+
+    private func ratingSection(voteAverage: Double) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("TMDb Rating")
+                .font(.headline)
+
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.title2)
+
+                Text(String(format: "%.1f", voteAverage))
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("/ 10")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if let voteCount = result.voteCount, voteCount > 0 {
+                    Text("(\(voteCount) votes)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
