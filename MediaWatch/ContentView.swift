@@ -78,31 +78,39 @@ enum Tab: Hashable {
 // MARK: - Watch Status Enum
 
 enum WatchStatus: Int16, CaseIterable {
-    case notWatched = 0
-    case watching = 1
-    case watched = 2
+    case current = 0
+    case waiting = 1
+    case new = 2
+    case haventStarted = 3
+    case maybe = 4
 
     var label: String {
         switch self {
-        case .notWatched: return "Not Watched"
-        case .watching: return "Watching"
-        case .watched: return "Watched"
+        case .current: return "Current"
+        case .waiting: return "Waiting"
+        case .new: return "New"
+        case .haventStarted: return "Haven't Started"
+        case .maybe: return "Maybe"
         }
     }
 
     var icon: String {
         switch self {
-        case .notWatched: return "circle"
-        case .watching: return "play.circle.fill"
-        case .watched: return "checkmark.circle.fill"
+        case .current: return "play.circle.fill"
+        case .waiting: return "clock.fill"
+        case .new: return "sparkles"
+        case .haventStarted: return "circle"
+        case .maybe: return "questionmark.circle"
         }
     }
 
     var color: Color {
         switch self {
-        case .notWatched: return .secondary
-        case .watching: return .blue
-        case .watched: return .green
+        case .current: return .blue
+        case .waiting: return .orange
+        case .new: return .green
+        case .haventStarted: return .secondary
+        case .maybe: return .purple
         }
     }
 }
@@ -112,83 +120,98 @@ enum WatchStatus: Int16, CaseIterable {
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
-    // Fetch currently watching titles
+    // Fetch Current titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.watching.rawValue),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.current.rawValue),
         animation: .default
     )
-    private var currentlyWatching: FetchedResults<Title>
+    private var currentTitles: FetchedResults<Title>
 
-    // Fetch watched titles
+    // Fetch Waiting titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.watchedDate, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.watched.rawValue),
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.waiting.rawValue),
         animation: .default
     )
-    private var watchedTitles: FetchedResults<Title>
+    private var waitingTitles: FetchedResults<Title>
+
+    // Fetch New titles
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.new.rawValue),
+        animation: .default
+    )
+    private var newTitles: FetchedResults<Title>
+
+    // Fetch Haven't Started titles
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.haventStarted.rawValue),
+        animation: .default
+    )
+    private var haventStartedTitles: FetchedResults<Title>
+
+    // Fetch Maybe titles
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.maybe.rawValue),
+        animation: .default
+    )
+    private var maybeTitles: FetchedResults<Title>
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
-                    // Currently Watching Section
-                    if !currentlyWatching.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: WatchStatus.watching.icon)
-                                    .foregroundStyle(WatchStatus.watching.color)
-                                Text("Currently Watching")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                            }
-                            .padding(.horizontal)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: 16) {
-                                    ForEach(currentlyWatching.prefix(10)) { title in
-                                        NavigationLink {
-                                            TitleDetailView(title: title)
-                                        } label: {
-                                            ContinueWatchingCard(title: title)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
+                    // Current Section
+                    if !currentTitles.isEmpty {
+                        statusSection(
+                            status: .current,
+                            titles: Array(currentTitles),
+                            useCarousel: true
+                        )
                     }
 
-                    // Watched Section
-                    if !watchedTitles.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: WatchStatus.watched.icon)
-                                    .foregroundStyle(WatchStatus.watched.color)
-                                Text("Watched")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                            }
-                            .padding(.horizontal)
+                    // Waiting Section
+                    if !waitingTitles.isEmpty {
+                        statusSection(
+                            status: .waiting,
+                            titles: Array(waitingTitles),
+                            useCarousel: true
+                        )
+                    }
 
-                            LazyVStack(spacing: 12) {
-                                ForEach(watchedTitles.prefix(10)) { title in
-                                    NavigationLink {
-                                        TitleDetailView(title: title)
-                                    } label: {
-                                        RecentlyWatchedRow(title: title)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
+                    // New Section
+                    if !newTitles.isEmpty {
+                        statusSection(
+                            status: .new,
+                            titles: Array(newTitles),
+                            useCarousel: true
+                        )
+                    }
+
+                    // Haven't Started Section
+                    if !haventStartedTitles.isEmpty {
+                        statusSection(
+                            status: .haventStarted,
+                            titles: Array(haventStartedTitles),
+                            useCarousel: true
+                        )
+                    }
+
+                    // Maybe Section
+                    if !maybeTitles.isEmpty {
+                        statusSection(
+                            status: .maybe,
+                            titles: Array(maybeTitles),
+                            useCarousel: true
+                        )
                     }
 
                     // Empty State
-                    if currentlyWatching.isEmpty && watchedTitles.isEmpty {
+                    if currentTitles.isEmpty && waitingTitles.isEmpty && newTitles.isEmpty && haventStartedTitles.isEmpty && maybeTitles.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "film.stack")
                                 .font(.system(size: 60))
@@ -215,6 +238,35 @@ struct HomeView: View {
             .navigationTitle("Home")
         }
     }
+
+    private func statusSection(status: WatchStatus, titles: [Title], useCarousel: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: status.icon)
+                    .foregroundStyle(status.color)
+                Text(status.label)
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            .padding(.horizontal)
+
+            if useCarousel {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 16) {
+                        ForEach(titles.prefix(10)) { title in
+                            NavigationLink {
+                                TitleDetailView(title: title)
+                            } label: {
+                                ContinueWatchingCard(title: title)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Continue Watching Card
@@ -224,21 +276,29 @@ struct ContinueWatchingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
-                .frame(width: 120, height: 180)
-                .cornerRadius(8)
+            ZStack(alignment: .bottomLeading) {
+                PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
+                    .frame(width: 120, height: 180)
+                    .cornerRadius(8)
+
+                // Season/Episode badge for TV shows
+                if title.mediaType == "tv" {
+                    Text("S\(title.currentSeason) E\(title.currentEpisode)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(4)
+                        .padding(6)
+                }
+            }
 
             Text(title.title ?? "Unknown")
                 .font(.caption)
                 .fontWeight(.medium)
                 .lineLimit(2)
                 .frame(width: 120, alignment: .leading)
-
-            if title.numberOfSeasons > 0 {
-                Text("S\(title.numberOfSeasons)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }
@@ -529,16 +589,42 @@ struct TitleGridItem: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
                     .aspectRatio(2/3, contentMode: .fit)
                     .cornerRadius(8)
 
-                if title.watched {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .background(Circle().fill(.black.opacity(0.5)))
-                        .padding(6)
+                // Watch status icon
+                VStack {
+                    HStack {
+                        Spacer()
+                        let status = WatchStatus(rawValue: title.watchStatus) ?? .haventStarted
+                        Image(systemName: status.icon)
+                            .font(.caption)
+                            .foregroundStyle(status.color)
+                            .padding(4)
+                            .background(Circle().fill(.ultraThinMaterial))
+                            .padding(4)
+                    }
+                    Spacer()
+                }
+
+                // Season/Episode badge for TV shows
+                if title.mediaType == "tv" {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Text("S\(title.currentSeason) E\(title.currentEpisode)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(4)
+                                .padding(6)
+                            Spacer()
+                        }
+                    }
                 }
             }
 
@@ -573,17 +659,14 @@ struct TitleListRow: View {
                         Text("•")
                         Text("\(title.year)")
                     }
+                    // Show season/episode for TV shows
+                    if title.mediaType == "tv" {
+                        Text("•")
+                        Text("S\(title.currentSeason) E\(title.currentEpisode)")
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-                // Progress indicator for TV shows
-                if title.mediaType == "tv" && title.numberOfEpisodes > 0 {
-                    let watchedEpisodes = (title.episodes as? Set<Episode>)?.filter { $0.watched }.count ?? 0
-                    Text("\(watchedEpisodes)/\(title.numberOfEpisodes) episodes")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
 
                 // Liked status
                 HStack(spacing: 4) {
@@ -634,6 +717,7 @@ struct TitleDetailView: View {
     @State private var isLoadingEpisodes = false
     @State private var episodeLoadError: String?
     @State private var showingDeleteConfirmation = false
+    @State private var episodeRefreshTrigger = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -1152,6 +1236,7 @@ struct TitleDetailView: View {
                                         }
                                     }
                                     try? viewContext.save()
+                                    episodeRefreshTrigger.toggle()
                                 } label: {
                                     Image(systemName: seasonEpisodes.allSatisfy { $0.watched } ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(seasonEpisodes.allSatisfy { $0.watched } ? .green : .secondary)
@@ -1166,34 +1251,46 @@ struct TitleDetailView: View {
                         if expandedSeasons.contains(seasonNumber) {
                             VStack(spacing: 0) {
                                 ForEach(seasonEpisodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
-                                    HStack {
-                                        Button {
-                                            episode.watched.toggle()
-                                            if episode.watched {
-                                                episode.watchedDate = Date()
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Button {
+                                                episode.watched.toggle()
+                                                if episode.watched {
+                                                    episode.watchedDate = Date()
+                                                }
+                                                try? viewContext.save()
+                                                episodeRefreshTrigger.toggle()
+                                            } label: {
+                                                Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundStyle(episode.watched ? .green : .secondary)
                                             }
-                                            try? viewContext.save()
-                                        } label: {
-                                            Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
-                                                .foregroundStyle(episode.watched ? .green : .secondary)
-                                        }
-                                        .buttonStyle(.plain)
+                                            .buttonStyle(.plain)
 
-                                        Text("\(episode.episodeNumber).")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 25, alignment: .leading)
-
-                                        Text(episode.name ?? "Episode \(episode.episodeNumber)")
-                                            .font(.subheadline)
-                                            .lineLimit(1)
-
-                                        Spacer()
-
-                                        if episode.runtime > 0 {
-                                            Text("\(episode.runtime)m")
-                                                .font(.caption2)
+                                            Text("\(episode.episodeNumber).")
+                                                .font(.caption)
                                                 .foregroundStyle(.secondary)
+                                                .frame(width: 25, alignment: .leading)
+
+                                            Text(episode.name ?? "Episode \(episode.episodeNumber)")
+                                                .font(.subheadline)
+                                                .lineLimit(1)
+
+                                            Spacer()
+
+                                            if episode.runtime > 0 {
+                                                Text("\(episode.runtime)m")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+
+                                        // Episode description
+                                        if let overview = episode.overview, !overview.isEmpty {
+                                            Text(overview)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(3)
+                                                .padding(.leading, 53)
                                         }
                                     }
                                     .padding(.vertical, 6)
@@ -1216,6 +1313,7 @@ struct TitleDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .id(episodeRefreshTrigger)
     }
 
     private func loadEpisodes() {
