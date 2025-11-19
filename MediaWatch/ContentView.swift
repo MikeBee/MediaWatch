@@ -1408,6 +1408,15 @@ struct TitleDetailView: View {
                         LinkButton(icon: "star", label: "IMDb")
                     }
                 }
+
+                // Wikipedia
+                if let titleName = title.title,
+                   let encodedTitle = titleName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                   let wikiURL = URL(string: "https://en.wikipedia.org/wiki/Special:Search?search=\(encodedTitle)") {
+                    Link(destination: wikiURL) {
+                        LinkButton(icon: "book.closed", label: "Wiki")
+                    }
+                }
             }
         }
     }
