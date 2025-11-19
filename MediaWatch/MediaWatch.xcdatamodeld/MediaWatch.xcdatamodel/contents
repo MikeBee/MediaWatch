@@ -15,13 +15,6 @@
         <attribute name="watchedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="notes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Note" inverseName="episode" inverseEntity="Note"/>
         <relationship name="show" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Title" inverseName="episodes" inverseEntity="Title"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="show"/>
-                <constraint value="seasonNumber"/>
-                <constraint value="episodeNumber"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
     <entity name="List" representedClassName="MediaList" syncable="YES" codeGenerationType="class">
         <attribute name="colorHex" optional="YES" attributeType="String"/>
@@ -40,12 +33,6 @@
         <attribute name="orderIndex" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="list" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="List" inverseName="items" inverseEntity="List"/>
         <relationship name="title" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Title" inverseName="listItems" inverseEntity="Title"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="list"/>
-                <constraint value="title"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
     <entity name="Note" representedClassName="Note" syncable="YES" codeGenerationType="class">
         <attribute name="dateCreated" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
@@ -89,12 +76,6 @@
         <relationship name="episodes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Episode" inverseName="show" inverseEntity="Episode"/>
         <relationship name="listItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ListItem" inverseName="title" inverseEntity="ListItem"/>
         <relationship name="notes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Note" inverseName="title" inverseEntity="Note"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="tmdbId"/>
-                <constraint value="mediaType"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
     <entity name="UserPreferences" representedClassName="UserPreferences" syncable="YES" codeGenerationType="class">
         <attribute name="appVersion" optional="YES" attributeType="String"/>
