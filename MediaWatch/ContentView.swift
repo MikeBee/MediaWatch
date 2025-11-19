@@ -583,16 +583,8 @@ struct ListDetailView: View {
 
                     Divider()
 
-                    // Sharing toggle
-                    Button {
-                        list.isShared.toggle()
-                        try? viewContext.save()
-                    } label: {
-                        Label(
-                            list.isShared ? "Make Private" : "Make Shared",
-                            systemImage: list.isShared ? "lock" : "person.2"
-                        )
-                    }
+                    // CloudKit Sharing
+                    ShareListButton(list: list)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
