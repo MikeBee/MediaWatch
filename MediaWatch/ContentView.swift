@@ -593,14 +593,8 @@ struct AddToListSheet: View {
 
     let result: TMDbSearchResult
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
-        animation: .default
-    )
-    private var lists: FetchedResults<MediaList>
-
+    @State private var lists: [MediaList] = []
     @State private var isAdding = false
-    @State private var showingNewList = false
 
     var body: some View {
         NavigationStack {
@@ -660,11 +654,25 @@ struct AddToListSheet: View {
                     }
                 }
             }
+            .onAppear {
+                fetchLists()
+            }
+        }
+    }
+
+    private func fetchLists() {
+        let request: NSFetchRequest<MediaList> = NSFetchRequest(entityName: "List")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)]
+
+        do {
+            lists = try viewContext.fetch(request)
+        } catch {
+            print("Error fetching lists: \(error)")
         }
     }
 
     private func createDefaultList() {
-        let list = TMDbMapper.createList(
+        _ = TMDbMapper.createList(
             name: "Watchlist",
             icon: "list.bullet",
             colorHex: "007AFF",
@@ -674,6 +682,7 @@ struct AddToListSheet: View {
 
         do {
             try viewContext.save()
+            fetchLists() // Refresh the list
         } catch {
             print("Error creating list: \(error)")
         }
