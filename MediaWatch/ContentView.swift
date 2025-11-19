@@ -78,39 +78,39 @@ enum Tab: Hashable {
 // MARK: - Watch Status Enum
 
 enum WatchStatus: Int16, CaseIterable {
-    case watching = 0
+    case current = 0
     case waiting = 1
-    case paused = 2
+    case new = 2
     case haventStarted = 3
-    case finished = 4
+    case maybe = 4
 
     var label: String {
         switch self {
-        case .watching: return "Watching"
+        case .current: return "Current"
         case .waiting: return "Waiting"
-        case .paused: return "Paused"
+        case .new: return "New"
         case .haventStarted: return "Haven't Started"
-        case .finished: return "Finished"
+        case .maybe: return "Maybe"
         }
     }
 
     var icon: String {
         switch self {
-        case .watching: return "play.circle.fill"
+        case .current: return "play.circle.fill"
         case .waiting: return "clock.fill"
-        case .paused: return "pause.circle.fill"
+        case .new: return "sparkles"
         case .haventStarted: return "circle"
-        case .finished: return "checkmark.circle.fill"
+        case .maybe: return "questionmark.circle"
         }
     }
 
     var color: Color {
         switch self {
-        case .watching: return .blue
+        case .current: return .blue
         case .waiting: return .orange
-        case .paused: return .yellow
+        case .new: return .green
         case .haventStarted: return .secondary
-        case .finished: return .green
+        case .maybe: return .purple
         }
     }
 }
@@ -157,6 +157,30 @@ extension Title {
         }
         return StreamingService(rawValue: serviceName) ?? .other
     }
+
+    /// Get cast members from stored data
+    var castMembers: [CastMember] {
+        guard let data = castData else { return [] }
+        do {
+            return try JSONDecoder().decode([CastMember].self, from: data)
+        } catch {
+            return []
+        }
+    }
+
+    /// Set cast members to stored data
+    func setCast(_ members: [CastMember]) {
+        do {
+            castData = try JSONEncoder().encode(members)
+        } catch {
+            castData = nil
+        }
+    }
+
+    /// Get cast names for searching
+    var castNames: [String] {
+        castMembers.map { $0.name }
+    }
 }
 
 // MARK: - Home View (Dashboard)
@@ -167,7 +191,7 @@ struct HomeView: View {
     // Fetch Current titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.watching.rawValue),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.current.rawValue),
         animation: .default
     )
     private var currentTitles: FetchedResults<Title>
@@ -183,7 +207,7 @@ struct HomeView: View {
     // Fetch New titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.paused.rawValue),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.new.rawValue),
         animation: .default
     )
     private var newTitles: FetchedResults<Title>
@@ -199,7 +223,7 @@ struct HomeView: View {
     // Fetch Maybe titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.finished.rawValue),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.maybe.rawValue),
         animation: .default
     )
     private var maybeTitles: FetchedResults<Title>
@@ -209,10 +233,10 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
-                    // Watching Section
+                    // Current Section
                     if !currentTitles.isEmpty {
                         statusSection(
-                            status: .watching,
+                            status: .current,
                             titles: Array(currentTitles),
                             useCarousel: true
                         )
@@ -227,10 +251,10 @@ struct HomeView: View {
                         )
                     }
 
-                    // Paused Section
+                    // New Section
                     if !newTitles.isEmpty {
                         statusSection(
-                            status: .paused,
+                            status: .new,
                             titles: Array(newTitles),
                             useCarousel: true
                         )
@@ -245,10 +269,10 @@ struct HomeView: View {
                         )
                     }
 
-                    // Finished Section
+                    // Maybe Section
                     if !maybeTitles.isEmpty {
                         statusSection(
-                            status: .finished,
+                            status: .maybe,
                             titles: Array(maybeTitles),
                             useCarousel: true
                         )
@@ -334,7 +358,7 @@ struct ContinueWatchingCard: View {
                                 .font(.system(size: 8, weight: .bold))
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 2)
-                                .background((Color(hex: title.streamingServiceEnum.color) ?? .gray))
+                                .background(Color(hex: title.streamingServiceEnum.color))
                                 .foregroundStyle(.white)
                                 .cornerRadius(3)
                                 .padding(4)
@@ -677,7 +701,7 @@ struct TitleGridItem: View {
                                 .font(.system(size: 7, weight: .bold))
                                 .padding(.horizontal, 3)
                                 .padding(.vertical, 2)
-                                .background((Color(hex: title.streamingServiceEnum.color) ?? .gray))
+                                .background(Color(hex: title.streamingServiceEnum.color))
                                 .foregroundStyle(.white)
                                 .cornerRadius(3)
                                 .padding(4)
@@ -757,7 +781,7 @@ struct TitleListRow: View {
                             .font(.caption2)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background((Color(hex: title.streamingServiceEnum.color) ?? .gray))
+                            .background(Color(hex: title.streamingServiceEnum.color))
                             .foregroundStyle(.white)
                             .cornerRadius(3)
                     }
@@ -812,6 +836,8 @@ struct TitleDetailView: View {
     @State private var availableProviders: [TMDbWatchProvider] = []
     @State private var isLoadingProviders = false
     @State private var showingStreamingPicker = false
+    @State private var isLoadingCast = false
+    @State private var expandedCast = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -837,6 +863,9 @@ struct TitleDetailView: View {
 
                         // Synopsis
                         synopsisSection
+
+                        // Cast
+                        castSection
 
                         // Notes
                         notesSection
@@ -938,28 +967,10 @@ struct TitleDetailView: View {
 
                 // Title and Year
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top) {
-                        Text(title.title ?? "Unknown")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .lineLimit(3)
-
-                        Spacer()
-
-                        // Favorite star indicator
-                        if title.userRating > 0 {
-                            HStack(spacing: 2) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                Text(String(format: "%.1f", title.userRating))
-                            }
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(4)
-                        }
-                    }
+                    Text(title.title ?? "Unknown")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .lineLimit(3)
 
                     if title.year > 0 {
                         Text("\(title.year)")
@@ -975,6 +986,8 @@ struct TitleDetailView: View {
                         .background(Color.accentColor.opacity(0.3))
                         .cornerRadius(4)
                 }
+
+                Spacer()
             }
             .padding()
         }
@@ -1015,7 +1028,7 @@ struct TitleDetailView: View {
     // MARK: - Liked Status Section
 
     private var likedStatusSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // Yes/No/Maybe buttons
             HStack(spacing: 16) {
                 LikeButton(
@@ -1041,7 +1054,7 @@ struct TitleDetailView: View {
                 LikeButton(
                     icon: "minus",
                     label: "Maybe",
-                    isSelected: title.likedStatus == 0 && (title.likedStatus != 1 && title.likedStatus != -1),
+                    isSelected: title.likedStatus == 0,
                     color: .gray
                 ) {
                     title.likedStatus = 0
@@ -1139,7 +1152,7 @@ struct TitleDetailView: View {
                                 .font(.subheadline)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background((Color(hex: service.color) ?? .gray))
+                                .background(Color(hex: service.color))
                                 .foregroundStyle(.white)
                                 .cornerRadius(6)
                         } else {
@@ -1275,6 +1288,111 @@ struct TitleDetailView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .italic()
+            }
+        }
+    }
+
+    // MARK: - Cast Section
+
+    private var castSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation {
+                    expandedCast.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Cast")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if isLoadingCast {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: expandedCast ? "chevron.up" : "chevron.down")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            if expandedCast {
+                let cast = title.castMembers
+                if cast.isEmpty {
+                    if !isLoadingCast {
+                        Button("Load Cast") {
+                            Task {
+                                await loadCast()
+                            }
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(cast.prefix(20)) { member in
+                            HStack(spacing: 12) {
+                                // Profile image placeholder
+                                if let profilePath = member.profilePath {
+                                    AsyncImage(url: TMDbService.profileURL(path: profilePath)) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Color.gray.opacity(0.3)
+                                    }
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.title)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 40, height: 40)
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(member.name)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    if !member.character.isEmpty {
+                                        Text(member.character)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            if title.castMembers.isEmpty {
+                await loadCast()
+            }
+        }
+    }
+
+    private func loadCast() async {
+        isLoadingCast = true
+        do {
+            let credits: TMDbCreditsResponse
+            if title.mediaType == "movie" {
+                credits = try await TMDbService.shared.getMovieCredits(id: Int(title.tmdbId))
+            } else {
+                credits = try await TMDbService.shared.getTVCredits(id: Int(title.tmdbId))
+            }
+
+            let castMembers = credits.cast.prefix(20).map { CastMember(from: $0) }
+            await MainActor.run {
+                title.setCast(Array(castMembers))
+                try? viewContext.save()
+                isLoadingCast = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingCast = false
             }
         }
     }
@@ -1682,16 +1800,16 @@ struct TitleDetailView: View {
             Button {
                 let nextStatus: WatchStatus
                 switch currentStatus {
-                case .watching:
+                case .current:
                     nextStatus = .waiting
                 case .waiting:
-                    nextStatus = .paused
-                case .paused:
+                    nextStatus = .new
+                case .new:
                     nextStatus = .haventStarted
                 case .haventStarted:
-                    nextStatus = .finished
-                case .finished:
-                    nextStatus = .watching
+                    nextStatus = .maybe
+                case .maybe:
+                    nextStatus = .current
                 }
                 title.watchStatus = nextStatus.rawValue
                 title.dateModified = Date()
@@ -2081,159 +2199,11 @@ struct SearchView: View {
     @State private var errorMessage: String?
     @State private var selectedResult: TMDbSearchResult?
 
-    // Library search
-    @State private var searchMode: SearchMode = .tmdb
-    @State private var mediaTypeFilter: MediaTypeFilter = .all
-    @State private var likedFilter: LikedFilter = .all
-    @State private var showFilters = false
-
-    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateAdded, ascending: false)])
-    private var allTitles: FetchedResults<Title>
-
-    enum SearchMode: String, CaseIterable {
-        case tmdb = "TMDb"
-        case library = "My Library"
-    }
-
-    enum MediaTypeFilter: String, CaseIterable {
-        case all = "All"
-        case movie = "Movies"
-        case tv = "TV Shows"
-    }
-
-    enum LikedFilter: String, CaseIterable {
-        case all = "All"
-        case yes = "Yes"
-        case no = "No"
-        case maybe = "Maybe"
-    }
-
-    var filteredLibraryResults: [Title] {
-        var results = Array(allTitles)
-
-        // Filter by search text
-        if !searchText.isEmpty {
-            let lowercased = searchText.lowercased()
-            results = results.filter { title in
-                // Search in title
-                if title.title?.lowercased().contains(lowercased) == true {
-                    return true
-                }
-                // Search in overview/description
-                if title.overview?.lowercased().contains(lowercased) == true {
-                    return true
-                }
-                // Search in genres
-                if let genres = title.genres {
-                    if genres.contains(where: { $0.lowercased().contains(lowercased) }) {
-                        return true
-                    }
-                }
-                return false
-            }
-        }
-
-        // Filter by media type
-        switch mediaTypeFilter {
-        case .all:
-            break
-        case .movie:
-            results = results.filter { $0.mediaType == "movie" }
-        case .tv:
-            results = results.filter { $0.mediaType == "tv" }
-        }
-
-        // Filter by liked status
-        switch likedFilter {
-        case .all:
-            break
-        case .yes:
-            results = results.filter { $0.likedStatus == 1 }
-        case .no:
-            results = results.filter { $0.likedStatus == -1 }
-        case .maybe:
-            results = results.filter { $0.likedStatus == 0 }
-        }
-
-        return results
-    }
-
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Search mode picker
-                Picker("Search Mode", selection: $searchMode) {
-                    ForEach(SearchMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.top, 8)
-
-                // Filters for library search
-                if searchMode == .library {
-                    VStack(spacing: 8) {
-                        Button {
-                            withAnimation {
-                                showFilters.toggle()
-                            }
-                        } label: {
-                            HStack {
-                                Text("Filters")
-                                    .font(.subheadline)
-                                Spacer()
-                                Image(systemName: showFilters ? "chevron.up" : "chevron.down")
-                            }
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
-
-                        if showFilters {
-                            VStack(spacing: 12) {
-                                // Media type filter
-                                HStack {
-                                    Text("Type")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Picker("Type", selection: $mediaTypeFilter) {
-                                        ForEach(MediaTypeFilter.allCases, id: \.self) { type in
-                                            Text(type.rawValue).tag(type)
-                                        }
-                                    }
-                                    .pickerStyle(.segmented)
-                                    .frame(width: 200)
-                                }
-
-                                // Liked filter
-                                HStack {
-                                    Text("Rating")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Picker("Liked", selection: $likedFilter) {
-                                        ForEach(LikedFilter.allCases, id: \.self) { liked in
-                                            Text(liked.rawValue).tag(liked)
-                                        }
-                                    }
-                                    .pickerStyle(.segmented)
-                                    .frame(width: 200)
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.bottom, 8)
-                        }
-                    }
-                    .background(Color(.systemGray6).opacity(0.5))
-                }
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        if searchMode == .tmdb {
-                            // TMDb search content
-                            if searchText.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if searchText.isEmpty {
                         // Trending Section
                         if !trendingResults.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
@@ -2306,58 +2276,13 @@ struct SearchView: View {
                         }
                         .padding(.horizontal)
                     }
-                        } // end if searchMode == .tmdb
-                        else {
-                            // Library search results
-                            if filteredLibraryResults.isEmpty {
-                                if searchText.isEmpty && mediaTypeFilter == .all && likedFilter == .all {
-                                    VStack(spacing: 16) {
-                                        Image(systemName: "books.vertical")
-                                            .font(.system(size: 50))
-                                            .foregroundStyle(.secondary)
-
-                                        Text("Search Your Library")
-                                            .font(.title3)
-                                            .fontWeight(.semibold)
-
-                                        Text("Find titles in your collection by name, description, or genre")
-                                            .font(.body)
-                                            .foregroundStyle(.secondary)
-                                            .multilineTextAlignment(.center)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, 60)
-                                } else {
-                                    ContentUnavailableView {
-                                        Label("No Results", systemImage: "magnifyingglass")
-                                    } description: {
-                                        Text("No titles found matching your criteria")
-                                    }
-                                }
-                            } else {
-                                LazyVStack(spacing: 12) {
-                                    ForEach(filteredLibraryResults) { title in
-                                        NavigationLink {
-                                            TitleDetailView(title: title)
-                                        } label: {
-                                            TitleListRow(title: title)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
-                    .padding(.top)
                 }
+                .padding(.top)
             }
             .navigationTitle("Search")
-            .searchable(text: $searchText, prompt: searchMode == .tmdb ? "Search TMDb..." : "Search your library...")
+            .searchable(text: $searchText, prompt: "Movies, TV Shows...")
             .onSubmit(of: .search) {
-                if searchMode == .tmdb {
-                    performSearch()
-                }
+                performSearch()
             }
             .onChange(of: searchText) { oldValue, newValue in
                 if newValue.isEmpty {
@@ -3269,7 +3194,7 @@ struct StreamingServicePicker: View {
                                     .font(.subheadline)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background((Color(hex: service.color) ?? .gray))
+                                    .background(Color(hex: service.color))
                                     .foregroundStyle(.white)
                                     .cornerRadius(6)
                             } else {
@@ -3311,33 +3236,18 @@ struct StarRatingView: View {
                 starImage(for: star)
                     .foregroundStyle(.yellow)
                     .onTapGesture {
-                        // Tap on star sets full star
-                        if rating == Double(star) {
-                            // Tap same star clears
+                        let starValue = Double(star)
+                        if rating == starValue {
+                            // Second click on full star -> half star
+                            rating = starValue - 0.5
+                        } else if rating == starValue - 0.5 {
+                            // Third click on half star -> clear
                             rating = 0
-                        } else if rating == Double(star) - 0.5 {
-                            // Second tap makes full
-                            rating = Double(star)
                         } else {
-                            rating = Double(star)
+                            // First click -> full star
+                            rating = starValue
                         }
                     }
-                    .onTapGesture(count: 2) {
-                        // Double tap for half star
-                        rating = Double(star) - 0.5
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onEnded { value in
-                                let starWidth: CGFloat = 24
-                                let x = value.location.x
-                                if x < starWidth / 2 {
-                                    rating = Double(star) - 0.5
-                                } else {
-                                    rating = Double(star)
-                                }
-                            }
-                    )
             }
 
             if rating > 0 {
@@ -3359,6 +3269,34 @@ struct StarRatingView: View {
         } else {
             return Image(systemName: "star")
         }
+    }
+}
+
+// MARK: - Color Extension
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 

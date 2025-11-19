@@ -560,3 +560,54 @@ enum StreamingService: String, CaseIterable, Identifiable {
         return .other
     }
 }
+
+// MARK: - Credits/Cast
+
+struct TMDbCreditsResponse: Codable {
+    let id: Int
+    let cast: [TMDbCastMember]
+    let crew: [TMDbCrewMember]?
+}
+
+struct TMDbCastMember: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let character: String?
+    let profilePath: String?
+    let order: Int?
+    let knownForDepartment: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, character, order
+        case profilePath = "profile_path"
+        case knownForDepartment = "known_for_department"
+    }
+}
+
+struct TMDbCrewMember: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let job: String
+    let department: String
+    let profilePath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, job, department
+        case profilePath = "profile_path"
+    }
+}
+
+// Simple struct for storing cast in Core Data
+struct CastMember: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let character: String
+    let profilePath: String?
+
+    init(from tmdbCast: TMDbCastMember) {
+        self.id = tmdbCast.id
+        self.name = tmdbCast.name
+        self.character = tmdbCast.character ?? ""
+        self.profilePath = tmdbCast.profilePath
+    }
+}
