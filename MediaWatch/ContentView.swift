@@ -634,6 +634,7 @@ struct TitleDetailView: View {
     @State private var isLoadingEpisodes = false
     @State private var episodeLoadError: String?
     @State private var showingDeleteConfirmation = false
+    @State private var episodeRefreshTrigger = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -1152,6 +1153,7 @@ struct TitleDetailView: View {
                                         }
                                     }
                                     try? viewContext.save()
+                                    episodeRefreshTrigger.toggle()
                                 } label: {
                                     Image(systemName: seasonEpisodes.allSatisfy { $0.watched } ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(seasonEpisodes.allSatisfy { $0.watched } ? .green : .secondary)
@@ -1173,6 +1175,7 @@ struct TitleDetailView: View {
                                                 episode.watchedDate = Date()
                                             }
                                             try? viewContext.save()
+                                            episodeRefreshTrigger.toggle()
                                         } label: {
                                             Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
                                                 .foregroundStyle(episode.watched ? .green : .secondary)
@@ -1216,6 +1219,7 @@ struct TitleDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .id(episodeRefreshTrigger)
     }
 
     private func loadEpisodes() {
