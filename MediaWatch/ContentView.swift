@@ -633,6 +633,7 @@ struct TitleDetailView: View {
     @State private var expandedSeasons: Set<Int> = []
     @State private var isLoadingEpisodes = false
     @State private var episodeLoadError: String?
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -691,10 +692,26 @@ struct TitleDetailView: View {
                     } label: {
                         Label("Manage Lists", systemImage: "list.bullet")
                     }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .alert("Delete Title", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteTitle()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(title.title ?? "this title")\"? This will remove it from all lists and delete all associated notes and episode data.")
         }
         .sheet(isPresented: $showingNotesEditor) {
             NotesEditorSheet(title: title)
@@ -1222,6 +1239,16 @@ struct TitleDetailView: View {
                     episodeLoadError = "Failed to load episodes: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+
+    private func deleteTitle() {
+        viewContext.delete(title)
+        do {
+            try viewContext.save()
+            dismiss()
+        } catch {
+            print("Failed to delete title: \(error)")
         }
     }
 

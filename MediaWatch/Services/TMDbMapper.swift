@@ -438,12 +438,11 @@ extension TMDbMapper {
 
         let tvDetails = try await service.getTVDetails(id: Int(title.tmdbId))
 
-        // Update title with full details
-        mapTVDetails(tvDetails, to: title)
-
         // Load each season's episodes
         guard let seasons = tvDetails.seasons else { return }
 
+        // Fetch all season details first
+        var allSeasonDetails: [TMDbSeasonDetails] = []
         for season in seasons {
             // Skip specials (season 0) if desired
             guard season.seasonNumber > 0 else { continue }
@@ -452,8 +451,18 @@ extension TMDbMapper {
                 tvId: Int(title.tmdbId),
                 seasonNumber: season.seasonNumber
             )
+            allSeasonDetails.append(seasonDetails)
+        }
 
-            mapSeasonEpisodes(seasonDetails, to: title, context: context)
+        // Now perform all Core Data operations on the main thread
+        await MainActor.run {
+            // Update title with full details
+            mapTVDetails(tvDetails, to: title)
+
+            // Map all episodes
+            for seasonDetails in allSeasonDetails {
+                mapSeasonEpisodes(seasonDetails, to: title, context: context)
+            }
         }
     }
 }
