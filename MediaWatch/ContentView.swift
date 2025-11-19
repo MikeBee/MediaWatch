@@ -2410,8 +2410,19 @@ struct AddToListSheet: View {
 
 struct ProfileView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var appSettings = AppSettings.shared
     @State private var cacheSize = "Calculating..."
     @State private var showingClearCacheAlert = false
+    @State private var showingBackupExporter = false
+    @State private var showingRestoreImporter = false
+    @State private var backupData: Data?
+    @State private var isBackingUp = false
+    @State private var isRestoring = false
+    @State private var backupError: String?
+    @State private var restoreError: String?
+    @State private var showingRestoreSuccess = false
+    @State private var showingRestoreConfirmation = false
+    @State private var pendingRestoreData: Data?
 
     var body: some View {
         NavigationStack {
@@ -2419,6 +2430,16 @@ struct ProfileView: View {
                 // Stats Section
                 Section("Your Stats") {
                     StatsRow()
+                }
+
+                // Appearance Section
+                Section("Appearance") {
+                    Picker("Theme", selection: $appSettings.theme) {
+                        ForEach(AppTheme.allCases) { theme in
+                            Label(theme.displayName, systemImage: theme.icon)
+                                .tag(theme)
+                        }
+                    }
                 }
 
                 // Sync Section
@@ -2454,6 +2475,39 @@ struct ProfileView: View {
                     }
                 }
 
+                // Data Section
+                Section("Data") {
+                    Button {
+                        Task {
+                            await createBackup()
+                        }
+                    } label: {
+                        HStack {
+                            Label("Backup Data", systemImage: "arrow.up.doc")
+                            Spacer()
+                            if isBackingUp {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                    }
+                    .disabled(isBackingUp || isRestoring)
+
+                    Button {
+                        showingRestoreImporter = true
+                    } label: {
+                        HStack {
+                            Label("Restore from Backup", systemImage: "arrow.down.doc")
+                            Spacer()
+                            if isRestoring {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                    }
+                    .disabled(isBackingUp || isRestoring)
+                }
+
                 // App Section
                 Section("App") {
                     HStack {
@@ -2487,6 +2541,129 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("This will remove all cached images. They will be re-downloaded as needed.")
+            }
+            .fileExporter(
+                isPresented: $showingBackupExporter,
+                document: BackupDocument(data: backupData ?? Data()),
+                contentType: .json,
+                defaultFilename: "MediaWatch-Backup-\(formatDateForFilename()).json"
+            ) { result in
+                switch result {
+                case .success:
+                    break
+                case .failure(let error):
+                    backupError = error.localizedDescription
+                }
+            }
+            .fileImporter(
+                isPresented: $showingRestoreImporter,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    Task {
+                        await importBackup(from: url)
+                    }
+                case .failure(let error):
+                    restoreError = error.localizedDescription
+                }
+            }
+            .alert("Backup Error", isPresented: .constant(backupError != nil)) {
+                Button("OK") { backupError = nil }
+            } message: {
+                if let error = backupError {
+                    Text(error)
+                }
+            }
+            .alert("Restore Error", isPresented: .constant(restoreError != nil)) {
+                Button("OK") { restoreError = nil }
+            } message: {
+                if let error = restoreError {
+                    Text(error)
+                }
+            }
+            .alert("Restore Backup", isPresented: $showingRestoreConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    pendingRestoreData = nil
+                }
+                Button("Restore", role: .destructive) {
+                    Task {
+                        await performRestore()
+                    }
+                }
+            } message: {
+                Text("This will replace all your current data with the backup. This action cannot be undone.")
+            }
+            .alert("Restore Complete", isPresented: $showingRestoreSuccess) {
+                Button("OK") { }
+            } message: {
+                Text("Your data has been successfully restored from the backup.")
+            }
+        }
+    }
+
+    private func formatDateForFilename() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    private func createBackup() async {
+        isBackingUp = true
+        do {
+            backupData = try await BackupService.shared.createBackup(context: viewContext)
+            await MainActor.run {
+                isBackingUp = false
+                showingBackupExporter = true
+            }
+        } catch {
+            await MainActor.run {
+                isBackingUp = false
+                backupError = "Failed to create backup: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func importBackup(from url: URL) async {
+        guard url.startAccessingSecurityScopedResource() else {
+            await MainActor.run {
+                restoreError = "Unable to access the selected file."
+            }
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        do {
+            let data = try Data(contentsOf: url)
+            await MainActor.run {
+                pendingRestoreData = data
+                showingRestoreConfirmation = true
+            }
+        } catch {
+            await MainActor.run {
+                restoreError = "Failed to read backup file: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func performRestore() async {
+        guard let data = pendingRestoreData else { return }
+        isRestoring = true
+
+        do {
+            try await BackupService.shared.restoreBackup(from: data, context: viewContext)
+            await MainActor.run {
+                isRestoring = false
+                pendingRestoreData = nil
+                showingRestoreSuccess = true
+            }
+        } catch {
+            await MainActor.run {
+                isRestoring = false
+                pendingRestoreData = nil
+                restoreError = "Failed to restore backup: \(error.localizedDescription)"
             }
         }
     }

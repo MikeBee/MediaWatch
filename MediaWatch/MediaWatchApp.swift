@@ -14,6 +14,7 @@ struct MediaWatchApp: App {
     // MARK: - Properties
 
     @StateObject private var persistenceController = PersistenceController.shared
+    @StateObject private var appSettings = AppSettings.shared
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     // MARK: - Body
@@ -23,10 +24,23 @@ struct MediaWatchApp: App {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(persistenceController)
+                .environmentObject(appSettings)
+                .preferredColorScheme(colorScheme)
                 .onOpenURL { url in
                     // Handle CloudKit share URLs
                     handleShareURL(url)
                 }
+        }
+    }
+
+    private var colorScheme: ColorScheme? {
+        switch appSettings.theme {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
         }
     }
 
