@@ -661,13 +661,22 @@ struct AddToListSheet: View {
     }
 
     private func fetchLists() {
+        print("DEBUG: fetchLists called")
+        print("DEBUG: viewContext = \(viewContext)")
+        print("DEBUG: viewContext.persistentStoreCoordinator = \(String(describing: viewContext.persistentStoreCoordinator))")
+
         let request: NSFetchRequest<MediaList> = NSFetchRequest(entityName: "List")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)]
 
         do {
-            lists = try viewContext.fetch(request)
+            let fetchedLists = try viewContext.fetch(request)
+            print("DEBUG: Fetched \(fetchedLists.count) lists")
+            for list in fetchedLists {
+                print("DEBUG: List - \(list.name ?? "nil") id=\(String(describing: list.id))")
+            }
+            lists = fetchedLists
         } catch {
-            print("Error fetching lists: \(error)")
+            print("DEBUG ERROR fetching lists: \(error)")
         }
     }
 
