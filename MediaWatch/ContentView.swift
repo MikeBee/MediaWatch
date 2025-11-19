@@ -631,46 +631,51 @@ struct TitleDetailView: View {
     @State private var showingListManager = false
     @State private var expandedSynopsis = false
     @State private var expandedSeasons: Set<Int> = []
+    @State private var isLoadingEpisodes = false
+    @State private var episodeLoadError: String?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // MARK: - Header with Poster
-                headerSection
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    // MARK: - Header with Poster
+                    headerSection
+                        .frame(width: geometry.size.width)
 
-                // MARK: - Content
-                VStack(alignment: .leading, spacing: 24) {
-                    // Watch Status
-                    watchStatusSection
+                    // MARK: - Content
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Watch Status
+                        watchStatusSection
 
-                    // Liked Status Toggle
-                    likedStatusSection
+                        // Liked Status Toggle
+                        likedStatusSection
 
-                    // Basic Info
-                    basicInfoSection
+                        // Basic Info
+                        basicInfoSection
 
-                    // Synopsis
-                    synopsisSection
+                        // Synopsis
+                        synopsisSection
 
-                    // Notes
-                    notesSection
+                        // Notes
+                        notesSection
 
-                    // Progress Section
-                    progressSection
+                        // Progress Section
+                        progressSection
 
-                    // Lists Section
-                    listsSection
+                        // Lists Section
+                        listsSection
 
-                    // External Links
-                    externalLinksSection
+                        // External Links
+                        externalLinksSection
 
-                    Spacer(minLength: 100)
+                        Spacer(minLength: 100)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .frame(width: geometry.size.width)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
             }
         }
-        .frame(maxWidth: .infinity)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
@@ -1019,84 +1024,203 @@ struct TitleDetailView: View {
     }
 
     private var tvShowProgressSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Current progress inputs
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Season")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Button {
-                            if title.currentSeason > 1 {
-                                title.currentSeason -= 1
-                                try? viewContext.save()
-                            }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
+        let episodes = (title.episodes as? Set<Episode>) ?? []
+        let sortedEpisodes = episodes.sorted {
+            $0.seasonNumber == $1.seasonNumber
+                ? $0.episodeNumber < $1.episodeNumber
+                : $0.seasonNumber < $1.seasonNumber
+        }
+        let seasons = Dictionary(grouping: sortedEpisodes) { Int($0.seasonNumber) }
+            .sorted { $0.key < $1.key }
+        let watchedCount = episodes.filter { $0.watched }.count
+        let totalCount = episodes.count
 
-                        Text("\(title.currentSeason)")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .frame(minWidth: 30)
-
-                        Button {
-                            title.currentSeason += 1
-                            try? viewContext.save()
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
+        return VStack(alignment: .leading, spacing: 12) {
+            // Episode progress summary
+            if totalCount > 0 {
+                HStack {
+                    Text("\(watchedCount) of \(totalCount) episodes")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(Int(Double(watchedCount) / Double(totalCount) * 100))%")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(watchedCount == totalCount ? .green : .primary)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Episode")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Button {
-                            if title.currentEpisode > 1 {
-                                title.currentEpisode -= 1
-                                try? viewContext.save()
-                            }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
+                // Progress bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 4)
+                            .cornerRadius(2)
 
-                        Text("\(title.currentEpisode)")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .frame(minWidth: 30)
-
-                        Button {
-                            title.currentEpisode += 1
-                            try? viewContext.save()
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
+                        Rectangle()
+                            .fill(watchedCount == totalCount ? Color.green : Color.accentColor)
+                            .frame(width: geometry.size.width * CGFloat(watchedCount) / CGFloat(max(totalCount, 1)), height: 4)
+                            .cornerRadius(2)
                     }
                 }
-
-                Spacer()
+                .frame(height: 4)
             }
-            .padding()
-            .background(Color(.systemGray6).opacity(0.5))
-            .cornerRadius(12)
 
-            // Show total seasons if known
-            if title.numberOfSeasons > 0 {
+            // Load/Refresh Episodes Button
+            Button {
+                loadEpisodes()
+            } label: {
+                HStack {
+                    if isLoadingEpisodes {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: episodes.isEmpty ? "arrow.down.circle" : "arrow.clockwise")
+                    }
+                    Text(episodes.isEmpty ? "Load Episodes" : "Refresh Episodes")
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color(.systemGray6).opacity(0.5))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoadingEpisodes)
+
+            // Error message
+            if let error = episodeLoadError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            // Seasons list with episodes
+            if !seasons.isEmpty {
+                ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
+                    VStack(spacing: 0) {
+                        // Season header
+                        Button {
+                            withAnimation {
+                                if expandedSeasons.contains(seasonNumber) {
+                                    expandedSeasons.remove(seasonNumber)
+                                } else {
+                                    expandedSeasons.insert(seasonNumber)
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: expandedSeasons.contains(seasonNumber) ? "chevron.down" : "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 20)
+
+                                Text("Season \(seasonNumber)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+
+                                Spacer()
+
+                                let seasonWatched = seasonEpisodes.filter { $0.watched }.count
+                                Text("\(seasonWatched)/\(seasonEpisodes.count)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                // Mark all button
+                                Button {
+                                    let allWatched = seasonEpisodes.allSatisfy { $0.watched }
+                                    for ep in seasonEpisodes {
+                                        ep.watched = !allWatched
+                                        if !allWatched {
+                                            ep.watchedDate = Date()
+                                        }
+                                    }
+                                    try? viewContext.save()
+                                } label: {
+                                    Image(systemName: seasonEpisodes.allSatisfy { $0.watched } ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(seasonEpisodes.allSatisfy { $0.watched } ? .green : .secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Episodes list (when expanded)
+                        if expandedSeasons.contains(seasonNumber) {
+                            VStack(spacing: 0) {
+                                ForEach(seasonEpisodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
+                                    HStack {
+                                        Button {
+                                            episode.watched.toggle()
+                                            if episode.watched {
+                                                episode.watchedDate = Date()
+                                            }
+                                            try? viewContext.save()
+                                        } label: {
+                                            Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(episode.watched ? .green : .secondary)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Text("\(episode.episodeNumber).")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 25, alignment: .leading)
+
+                                        Text(episode.name ?? "Episode \(episode.episodeNumber)")
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+
+                                        Spacer()
+
+                                        if episode.runtime > 0 {
+                                            Text("\(episode.runtime)m")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.leading, 28)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6).opacity(0.3))
+                    .cornerRadius(8)
+                }
+            }
+
+            // Show total seasons if known and no episodes loaded
+            if episodes.isEmpty && title.numberOfSeasons > 0 {
                 Text("Total: \(title.numberOfSeasons) seasons")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func loadEpisodes() {
+        isLoadingEpisodes = true
+        episodeLoadError = nil
+
+        Task {
+            do {
+                try await TMDbMapper.loadAllEpisodes(
+                    for: title,
+                    using: TMDbService.shared,
+                    context: viewContext
+                )
+                try viewContext.save()
+                await MainActor.run {
+                    isLoadingEpisodes = false
+                }
+            } catch {
+                await MainActor.run {
+                    isLoadingEpisodes = false
+                    episodeLoadError = "Failed to load episodes: \(error.localizedDescription)"
+                }
             }
         }
     }
