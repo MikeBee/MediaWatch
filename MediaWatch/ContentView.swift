@@ -31,25 +31,31 @@ struct ContentView: View {
                 iPhoneView
             }
         }
+        .onAppear {
+            // Set up TMDb API key (you'll need to replace this with your actual key)
+            Task {
+                await TMDbService.shared.setAPIKey("YOUR_TMDB_API_KEY")
+            }
+        }
     }
 
     // MARK: - iPhone View
 
     private var iPhoneView: some View {
         TabView(selection: $selectedTab) {
-            LibraryPlaceholderView()
+            LibraryView()
                 .tabItem {
                     Label("Library", systemImage: "list.bullet")
                 }
                 .tag(Tab.library)
 
-            SearchPlaceholderView()
+            SearchView()
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
                 .tag(Tab.search)
 
-            SettingsPlaceholderView()
+            SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
@@ -62,7 +68,7 @@ struct ContentView: View {
     private var iPadView: some View {
         NavigationSplitView {
             // Sidebar
-            SidebarPlaceholderView()
+            SidebarView()
         } content: {
             // Content
             ContentPlaceholderView()
@@ -82,14 +88,21 @@ enum Tab: Hashable {
     case settings
 }
 
-// MARK: - Placeholder Views
+// MARK: - Library View
 
-struct LibraryPlaceholderView: View {
+struct LibraryView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
         animation: .default
     )
     private var lists: FetchedResults<MediaList>
+
+    @State private var showingNewListSheet = false
+    @State private var newListName = ""
+    @State private var newListIcon = "list.bullet"
+    @State private var newListColor = "007AFF"
 
     var body: some View {
         NavigationStack {
@@ -101,7 +114,7 @@ struct LibraryPlaceholderView: View {
                         Text("Create your first list to start tracking content")
                     } actions: {
                         Button("Create List") {
-                            // Will be implemented
+                            showingNewListSheet = true
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -109,11 +122,12 @@ struct LibraryPlaceholderView: View {
                     List {
                         ForEach(lists) { list in
                             NavigationLink {
-                                ListDetailPlaceholderView(list: list)
+                                ListDetailView(list: list)
                             } label: {
                                 ListRowView(list: list)
                             }
                         }
+                        .onDelete(perform: deleteLists)
                     }
                 }
             }
@@ -121,15 +135,177 @@ struct LibraryPlaceholderView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        // Will be implemented
+                        showingNewListSheet = true
                     } label: {
                         Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNewListSheet) {
+                NewListSheet(
+                    name: $newListName,
+                    icon: $newListIcon,
+                    color: $newListColor,
+                    onCreate: createList
+                )
+            }
+        }
+    }
+
+    private func createList() {
+        withAnimation {
+            let list = TMDbMapper.createList(
+                name: newListName.isEmpty ? "New List" : newListName,
+                icon: newListIcon,
+                colorHex: newListColor,
+                context: viewContext
+            )
+
+            // Make first list the default
+            if lists.isEmpty {
+                list.isDefault = true
+            }
+
+            do {
+                try viewContext.save()
+            } catch {
+                print("Error creating list: \(error)")
+            }
+
+            // Reset form
+            newListName = ""
+            newListIcon = "list.bullet"
+            newListColor = "007AFF"
+        }
+    }
+
+    private func deleteLists(offsets: IndexSet) {
+        withAnimation {
+            offsets.map { lists[$0] }.forEach(viewContext.delete)
+
+            do {
+                try viewContext.save()
+            } catch {
+                print("Error deleting list: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - New List Sheet
+
+struct NewListSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @Binding var name: String
+    @Binding var icon: String
+    @Binding var color: String
+    var onCreate: () -> Void
+
+    private let icons = [
+        "list.bullet", "star", "heart", "film", "tv",
+        "popcorn", "ticket", "sparkles", "flag", "bookmark"
+    ]
+
+    private let colors = [
+        "007AFF", "FF3B30", "FF9500", "FFCC00", "34C759",
+        "5AC8FA", "AF52DE", "FF2D55", "8E8E93", "000000"
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("List Name", text: $name)
+                }
+
+                Section("Icon") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 16) {
+                        ForEach(icons, id: \.self) { iconName in
+                            Button {
+                                icon = iconName
+                            } label: {
+                                Image(systemName: iconName)
+                                    .font(.title2)
+                                    .frame(width: 44, height: 44)
+                                    .background(icon == iconName ? Color.accentColor.opacity(0.2) : Color.clear)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Section("Color") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 16) {
+                        ForEach(colors, id: \.self) { hexColor in
+                            Button {
+                                color = hexColor
+                            } label: {
+                                Circle()
+                                    .fill(Color(hex: hexColor))
+                                    .frame(width: 36, height: 36)
+                                    .overlay {
+                                        if color == hexColor {
+                                            Image(systemName: "checkmark")
+                                                .font(.caption)
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("New List")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        onCreate()
+                        dismiss()
                     }
                 }
             }
         }
     }
 }
+
+// MARK: - Color Extension for Hex
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - List Row View
 
 struct ListRowView: View {
     let list: MediaList
@@ -171,6 +347,8 @@ struct ListRowView: View {
     }
 }
 
+// MARK: - Circular Progress View
+
 struct CircularProgressView: View {
     let progress: Double
 
@@ -196,7 +374,9 @@ struct CircularProgressView: View {
     }
 }
 
-struct ListDetailPlaceholderView: View {
+// MARK: - List Detail View
+
+struct ListDetailView: View {
     let list: MediaList
 
     var body: some View {
@@ -219,19 +399,17 @@ struct ListDetailPlaceholderView: View {
     }
 }
 
+// MARK: - Title Row View
+
 struct TitleRowView: View {
     let title: Title
 
     var body: some View {
         HStack {
-            // Poster placeholder
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.3))
+            // Poster
+            PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
                 .frame(width: 50, height: 75)
-                .overlay {
-                    Image(systemName: title.isMovie ? "film" : "tv")
-                        .foregroundStyle(.gray)
-                }
+                .cornerRadius(4)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -283,23 +461,240 @@ struct TitleRowView: View {
     }
 }
 
-struct SearchPlaceholderView: View {
+// MARK: - Search View
+
+struct SearchView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+
     @State private var searchText = ""
+    @State private var searchResults: [TMDbSearchResult] = []
+    @State private var isSearching = false
+    @State private var errorMessage: String?
+    @State private var selectedResult: TMDbSearchResult?
+    @State private var showingAddToList = false
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        animation: .default
+    )
+    private var lists: FetchedResults<MediaList>
 
     var body: some View {
         NavigationStack {
-            ContentUnavailableView {
-                Label("Search", systemImage: "magnifyingglass")
-            } description: {
-                Text("Search for movies and TV shows to add to your library")
+            Group {
+                if searchText.isEmpty && searchResults.isEmpty {
+                    ContentUnavailableView {
+                        Label("Search", systemImage: "magnifyingglass")
+                    } description: {
+                        Text("Search for movies and TV shows to add to your library")
+                    }
+                } else if isSearching {
+                    ProgressView("Searching...")
+                } else if let error = errorMessage {
+                    ContentUnavailableView {
+                        Label("Error", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error)
+                    }
+                } else if searchResults.isEmpty && !searchText.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Results", systemImage: "magnifyingglass")
+                    } description: {
+                        Text("No movies or TV shows found for \"\(searchText)\"")
+                    }
+                } else {
+                    List {
+                        ForEach(searchResults) { result in
+                            SearchResultRow(result: result)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedResult = result
+                                    showingAddToList = true
+                                }
+                        }
+                    }
+                }
             }
             .navigationTitle("Search")
             .searchable(text: $searchText, prompt: "Movies, TV Shows...")
+            .onSubmit(of: .search) {
+                performSearch()
+            }
+            .onChange(of: searchText) { oldValue, newValue in
+                if newValue.isEmpty {
+                    searchResults = []
+                    errorMessage = nil
+                }
+            }
+            .sheet(isPresented: $showingAddToList) {
+                if let result = selectedResult {
+                    AddToListSheet(result: result, lists: Array(lists))
+                }
+            }
+        }
+    }
+
+    private func performSearch() {
+        guard !searchText.isEmpty else { return }
+
+        isSearching = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let response = try await TMDbService.shared.searchMulti(query: searchText)
+                await MainActor.run {
+                    // Filter to only movies and TV shows
+                    searchResults = response.results.filter {
+                        $0.resolvedMediaType == "movie" || $0.resolvedMediaType == "tv"
+                    }
+                    isSearching = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    isSearching = false
+                }
+            }
         }
     }
 }
 
-struct SettingsPlaceholderView: View {
+// MARK: - Search Result Row
+
+struct SearchResultRow: View {
+    let result: TMDbSearchResult
+
+    var body: some View {
+        HStack {
+            // Poster
+            PosterImageView(posterPath: result.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
+                .frame(width: 50, height: 75)
+                .cornerRadius(4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.displayTitle)
+                    .font(.headline)
+                    .lineLimit(2)
+
+                HStack {
+                    if let date = result.displayDate, date.count >= 4 {
+                        Text(String(date.prefix(4)))
+                    }
+                    Text("•")
+                    Text(result.resolvedMediaType == "movie" ? "Movie" : "TV Show")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let voteAverage = result.voteAverage, voteAverage > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", voteAverage))
+                    }
+                    .font(.caption)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "plus.circle")
+                .font(.title2)
+                .foregroundStyle(.accentColor)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Add To List Sheet
+
+struct AddToListSheet: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+
+    let result: TMDbSearchResult
+    let lists: [MediaList]
+
+    @State private var isAdding = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if lists.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Lists", systemImage: "list.bullet")
+                    } description: {
+                        Text("Create a list first to add this title")
+                    }
+                } else {
+                    List {
+                        ForEach(lists, id: \.objectID) { list in
+                            Button {
+                                addToList(list)
+                            } label: {
+                                HStack {
+                                    Image(systemName: list.displayIcon)
+                                        .foregroundStyle(list.displayColor)
+                                        .frame(width: 30)
+
+                                    Text(list.displayName)
+                                        .foregroundStyle(.primary)
+
+                                    Spacer()
+
+                                    if isAdding {
+                                        ProgressView()
+                                    }
+                                }
+                            }
+                            .disabled(isAdding)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add to List")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func addToList(_ list: MediaList) {
+        isAdding = true
+
+        Task {
+            // Create or get existing title
+            let title = TMDbMapper.mapSearchResult(result, context: viewContext)
+
+            // Add to list
+            _ = TMDbMapper.addTitle(title, to: list, context: viewContext)
+
+            do {
+                try viewContext.save()
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                print("Error adding to list: \(error)")
+                await MainActor.run {
+                    isAdding = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Settings View
+
+struct SettingsView: View {
+    @State private var cacheSize = "Calculating..."
+
     var body: some View {
         NavigationStack {
             List {
@@ -328,9 +723,21 @@ struct SettingsPlaceholderView: View {
                     }
                 }
 
-                Section("Backup") {
-                    Text("Export Data")
-                    Text("Import Data")
+                Section("Cache") {
+                    HStack {
+                        Text("Image Cache")
+                        Spacer()
+                        Text(cacheSize)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Clear Image Cache") {
+                        Task {
+                            await ImageCacheService.shared.clearAllCaches()
+                            cacheSize = await ImageCacheService.shared.formattedDiskCacheSize()
+                        }
+                    }
+                    .foregroundStyle(.red)
                 }
 
                 Section("About") {
@@ -340,20 +747,33 @@ struct SettingsPlaceholderView: View {
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
-                    Text("Clear Image Cache")
                 }
             }
             .navigationTitle("Settings")
+            .onAppear {
+                Task {
+                    cacheSize = await ImageCacheService.shared.formattedDiskCacheSize()
+                }
+            }
         }
     }
 }
 
-struct SidebarPlaceholderView: View {
+// MARK: - iPad Views
+
+struct SidebarView: View {
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        animation: .default
+    )
+    private var lists: FetchedResults<MediaList>
+
     var body: some View {
         List {
             Section("Lists") {
-                Label("Watchlist", systemImage: "list.bullet")
-                Label("Favorites", systemImage: "star")
+                ForEach(lists) { list in
+                    Label(list.displayName, systemImage: list.displayIcon)
+                }
             }
         }
         .navigationTitle("MediaWatch")
@@ -377,5 +797,4 @@ struct DetailPlaceholderView: View {
 #Preview {
     ContentView()
         .environment(\.managedObjectContext, PersistenceController.preview.viewContext)
-        .environmentObject(PersistenceController.preview)
 }
