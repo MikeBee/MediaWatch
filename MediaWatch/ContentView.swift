@@ -75,47 +75,83 @@ enum Tab: Hashable {
     case profile
 }
 
+// MARK: - Watch Status Enum
+
+enum WatchStatus: Int16, CaseIterable {
+    case notWatched = 0
+    case watching = 1
+    case watched = 2
+
+    var label: String {
+        switch self {
+        case .notWatched: return "Not Watched"
+        case .watching: return "Watching"
+        case .watched: return "Watched"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .notWatched: return "circle"
+        case .watching: return "play.circle.fill"
+        case .watched: return "checkmark.circle.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .notWatched: return .secondary
+        case .watching: return .blue
+        case .watched: return .green
+        }
+    }
+}
+
 // MARK: - Home View (Dashboard)
 
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
-    // Fetch recently watched titles
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.watchedDate, ascending: false)],
-        predicate: NSPredicate(format: "watched == YES"),
-        animation: .default
-    )
-    private var recentlyWatched: FetchedResults<Title>
-
-    // Fetch TV shows in progress
+    // Fetch currently watching titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "mediaType == %@ AND watched == NO", "tv"),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.watching.rawValue),
         animation: .default
     )
-    private var tvShowsInProgress: FetchedResults<Title>
+    private var currentlyWatching: FetchedResults<Title>
+
+    // Fetch watched titles
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.watchedDate, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.watched.rawValue),
+        animation: .default
+    )
+    private var watchedTitles: FetchedResults<Title>
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
-                    // Continue Watching Section
-                    if !tvShowsInProgress.isEmpty {
+                    // Currently Watching Section
+                    if !currentlyWatching.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Continue Watching")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Image(systemName: WatchStatus.watching.icon)
+                                    .foregroundStyle(WatchStatus.watching.color)
+                                Text("Currently Watching")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.horizontal)
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
-                                    ForEach(tvShowsInProgress.prefix(10)) { show in
+                                    ForEach(currentlyWatching.prefix(10)) { title in
                                         NavigationLink {
-                                            TitleDetailView(title: show)
+                                            TitleDetailView(title: title)
                                         } label: {
-                                            ContinueWatchingCard(title: show)
+                                            ContinueWatchingCard(title: title)
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -125,16 +161,20 @@ struct HomeView: View {
                         }
                     }
 
-                    // Recently Watched Section
-                    if !recentlyWatched.isEmpty {
+                    // Watched Section
+                    if !watchedTitles.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Recently Watched")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Image(systemName: WatchStatus.watched.icon)
+                                    .foregroundStyle(WatchStatus.watched.color)
+                                Text("Watched")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.horizontal)
 
                             LazyVStack(spacing: 12) {
-                                ForEach(recentlyWatched.prefix(5)) { title in
+                                ForEach(watchedTitles.prefix(10)) { title in
                                     NavigationLink {
                                         TitleDetailView(title: title)
                                     } label: {
@@ -148,7 +188,7 @@ struct HomeView: View {
                     }
 
                     // Empty State
-                    if tvShowsInProgress.isEmpty && recentlyWatched.isEmpty {
+                    if currentlyWatching.isEmpty && watchedTitles.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "film.stack")
                                 .font(.system(size: 60))
@@ -600,6 +640,9 @@ struct TitleDetailView: View {
 
                 // MARK: - Content
                 VStack(alignment: .leading, spacing: 24) {
+                    // Watch Status
+                    watchStatusSection
+
                     // Liked Status Toggle
                     likedStatusSection
 
@@ -715,6 +758,40 @@ struct TitleDetailView: View {
                 Spacer()
             }
             .padding()
+        }
+    }
+
+    // MARK: - Watch Status Section
+
+    private var watchStatusSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Watch Status")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                ForEach(WatchStatus.allCases, id: \.rawValue) { status in
+                    Button {
+                        title.watchStatus = status.rawValue
+                        if status == .watched {
+                            title.watchedDate = Date()
+                        }
+                        try? viewContext.save()
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: status.icon)
+                                .font(.title2)
+                            Text(status.label)
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(title.watchStatus == status.rawValue ? status.color.opacity(0.2) : Color(.systemGray6).opacity(0.5))
+                        .foregroundStyle(title.watchStatus == status.rawValue ? status.color : .secondary)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 
@@ -1091,26 +1168,35 @@ struct TitleDetailView: View {
     // MARK: - Action Bar
 
     private var actionBar: some View {
-        HStack(spacing: 0) {
-            // Progress / Watched
+        let currentStatus = WatchStatus(rawValue: title.watchStatus) ?? .notWatched
+
+        return HStack(spacing: 0) {
+            // Watch Status - cycles through statuses
             Button {
-                if title.mediaType == "movie" {
-                    title.watched.toggle()
-                    if title.watched {
-                        title.watchedDate = Date()
-                    }
-                    try? viewContext.save()
+                let nextStatus: WatchStatus
+                switch currentStatus {
+                case .notWatched:
+                    nextStatus = .watching
+                case .watching:
+                    nextStatus = .watched
+                case .watched:
+                    nextStatus = .notWatched
                 }
+                title.watchStatus = nextStatus.rawValue
+                if nextStatus == .watched {
+                    title.watchedDate = Date()
+                }
+                try? viewContext.save()
             } label: {
                 VStack(spacing: 4) {
-                    Image(systemName: title.watched ? "checkmark.circle.fill" : "checkmark.circle")
+                    Image(systemName: currentStatus.icon)
                         .font(.title3)
-                    Text(title.mediaType == "movie" ? "Watched" : "Progress")
+                    Text(currentStatus.label)
                         .font(.caption2)
                 }
                 .frame(maxWidth: .infinity)
             }
-            .foregroundStyle(title.watched ? .green : .primary)
+            .foregroundStyle(currentStatus.color)
 
             // Lists
             Button {
