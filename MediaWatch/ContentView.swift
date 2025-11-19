@@ -22,19 +22,30 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                // iPad layout
-                iPadView
-            } else {
-                // iPhone layout
-                iPhoneView
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                colors: [Color.black, Color(white: 0.15)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            Group {
+                if horizontalSizeClass == .regular {
+                    // iPad layout
+                    iPadView
+                } else {
+                    // iPhone layout
+                    iPhoneView
+                }
             }
         }
+        .preferredColorScheme(.dark)
         .onAppear {
-            // Set up TMDb API key (you'll need to replace this with your actual key)
+            // Set up TMDb API key
             Task {
-                await TMDbService.shared.setAPIKey("YOUR_TMDB_API_KEY")
+                await TMDbService.shared.setAPIKey("7f14a43f8de003da44bebf87a8d4d34b")
             }
         }
     }
@@ -445,12 +456,6 @@ struct SearchView: View {
     @State private var selectedResult: TMDbSearchResult?
     @State private var showingAddToList = false
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
-        animation: .default
-    )
-    private var lists: FetchedResults<MediaList>
-
     var body: some View {
         NavigationStack {
             Group {
@@ -500,7 +505,7 @@ struct SearchView: View {
             }
             .sheet(isPresented: $showingAddToList) {
                 if let result = selectedResult {
-                    AddToListSheet(result: result, lists: Array(lists))
+                    AddToListSheet(result: result)
                 }
             }
         }
@@ -586,9 +591,15 @@ struct AddToListSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let result: TMDbSearchResult
-    let lists: [MediaList]
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        animation: .default
+    )
+    private var lists: FetchedResults<MediaList>
 
     @State private var isAdding = false
+    @State private var showingNewList = false
 
     var body: some View {
         NavigationStack {
@@ -598,6 +609,11 @@ struct AddToListSheet: View {
                         Label("No Lists", systemImage: "list.bullet")
                     } description: {
                         Text("Create a list first to add this title")
+                    } actions: {
+                        Button("Create List") {
+                            createDefaultList()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 } else {
                     List {
@@ -633,7 +649,32 @@ struct AddToListSheet: View {
                         dismiss()
                     }
                 }
+                if !lists.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            createDefaultList()
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    private func createDefaultList() {
+        let list = TMDbMapper.createList(
+            name: "Watchlist",
+            icon: "list.bullet",
+            colorHex: "007AFF",
+            isDefault: true,
+            context: viewContext
+        )
+
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error creating list: \(error)")
         }
     }
 
