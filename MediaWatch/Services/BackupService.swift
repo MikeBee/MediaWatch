@@ -113,6 +113,7 @@ actor BackupService {
         let currentSeason: Int
         let currentEpisode: Int
         let streamingService: String?
+        let userRating: Double
     }
 
     struct EpisodeBackup: Codable {
@@ -237,7 +238,8 @@ actor BackupService {
                     likedStatus: Int(title.likedStatus),
                     currentSeason: Int(title.currentSeason),
                     currentEpisode: Int(title.currentEpisode),
-                    streamingService: title.streamingService
+                    streamingService: title.streamingService,
+                    userRating: title.userRating
                 )
             }
         }
@@ -350,6 +352,7 @@ actor BackupService {
                 title.currentSeason = Int16(titleBackup.currentSeason)
                 title.currentEpisode = Int16(titleBackup.currentEpisode)
                 title.streamingService = titleBackup.streamingService
+                title.userRating = titleBackup.userRating
 
                 titleMap[titleBackup.tmdbId] = title
             }
