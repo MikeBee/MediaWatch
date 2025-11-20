@@ -568,6 +568,32 @@ struct RecentlyWatchedRow: View {
 
 // MARK: - Lists View
 
+enum ListSortMode: String, CaseIterable {
+    case alpha = "Alphabetical"
+    case dateAdded = "Date Added"
+    case manual = "Manual"
+}
+
+enum ListFilterMode: String, CaseIterable {
+    case all = "All"
+    case private_ = "Private"
+    case shared = "Shared"
+
+    var displayName: String {
+        switch self {
+        case .all: return "All"
+        case .private_: return "Private"
+        case .shared: return "Shared"
+        }
+    }
+}
+
+enum ListViewMode: String, CaseIterable {
+    case carousel = "Carousel"
+    case grid = "Grid"
+    case list = "List"
+}
+
 struct ListsView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -575,49 +601,182 @@ struct ListsView: View {
         sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
         animation: .default
     )
-    private var lists: FetchedResults<MediaList>
+    private var allLists: FetchedResults<MediaList>
 
     @State private var showingNewListSheet = false
     @State private var newListName = ""
     @State private var newListIcon = "list.bullet"
     @State private var newListColor = "007AFF"
+    @State private var sortMode: ListSortMode = .manual
+    @State private var isAscending = true
+    @State private var filterMode: ListFilterMode = .all
+    @State private var viewMode: ListViewMode = .grid
+
+    private var filteredAndSortedLists: [MediaList] {
+        var results = Array(allLists)
+
+        // Apply filter
+        switch filterMode {
+        case .all:
+            break
+        case .private_:
+            results = results.filter { !$0.isShared }
+        case .shared:
+            results = results.filter { $0.isShared }
+        }
+
+        // Apply sort
+        switch sortMode {
+        case .alpha:
+            results.sort { list1, list2 in
+                let name1 = list1.name ?? ""
+                let name2 = list2.name ?? ""
+                return isAscending ? name1 < name2 : name1 > name2
+            }
+        case .dateAdded:
+            results.sort { list1, list2 in
+                let date1 = list1.dateCreated ?? Date.distantPast
+                let date2 = list2.dateCreated ?? Date.distantPast
+                return isAscending ? date1 < date2 : date1 > date2
+            }
+        case .manual:
+            results.sort { list1, list2 in
+                return isAscending ? list1.sortOrder < list2.sortOrder : list1.sortOrder > list2.sortOrder
+            }
+        }
+
+        return results
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // New List Button
-                    Button {
-                        showingNewListSheet = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
-                            Text("New List")
-                                .font(.headline)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
+                    // Control Bar
+                    VStack(spacing: 12) {
+                        // New List Button
+                        Button {
+                            showingNewListSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                Text("New List")
+                                    .font(.headline)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding()
+                            .background(Color.accentColor.opacity(0.2))
+                            .cornerRadius(12)
                         }
-                        .padding()
-                        .background(Color.accentColor.opacity(0.2))
-                        .cornerRadius(12)
+                        .buttonStyle(.plain)
+
+                        // Controls
+                        HStack(spacing: 8) {
+                            // Sort Menu
+                            Menu {
+                                ForEach(ListSortMode.allCases, id: \.self) { mode in
+                                    Button {
+                                        sortMode = mode
+                                    } label: {
+                                        HStack {
+                                            Text(mode.rawValue)
+                                            if sortMode == mode {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                    Text(sortMode.rawValue)
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                            }
+
+                            // Sort Direction
+                            Button {
+                                isAscending.toggle()
+                            } label: {
+                                Image(systemName: isAscending ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                                    .padding(6)
+                                    .background(Color(.systemGray5))
+                                    .cornerRadius(8)
+                            }
+
+                            // Filter Menu
+                            Menu {
+                                ForEach(ListFilterMode.allCases, id: \.self) { mode in
+                                    Button {
+                                        filterMode = mode
+                                    } label: {
+                                        HStack {
+                                            Text(mode.displayName)
+                                            if filterMode == mode {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "line.3.horizontal.decrease.circle")
+                                    Text(filterMode.displayName)
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                            }
+
+                            Spacer()
+
+                            // View Mode Menu
+                            Menu {
+                                ForEach(ListViewMode.allCases, id: \.self) { mode in
+                                    Button {
+                                        viewMode = mode
+                                    } label: {
+                                        HStack {
+                                            Text(mode.rawValue)
+                                            if viewMode == mode {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
+                                    .font(.caption)
+                                    .padding(6)
+                                    .background(Color(.systemGray5))
+                                    .cornerRadius(8)
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
                     .padding(.horizontal)
 
-                    // Lists
-                    if lists.isEmpty {
+                    // Lists Content
+                    if filteredAndSortedLists.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "list.bullet.rectangle")
                                 .font(.system(size: 50))
                                 .foregroundStyle(.secondary)
 
-                            Text("No Lists Yet")
+                            Text("No Lists")
                                 .font(.title3)
                                 .fontWeight(.semibold)
 
-                            Text("Create your first list to start organizing your movies and shows.")
+                            Text(allLists.isEmpty ? "Create your first list to start organizing your movies and shows." : "No lists match your filters.")
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -625,17 +784,70 @@ struct ListsView: View {
                         .padding(.top, 40)
                         .padding(.horizontal, 40)
                     } else {
-                        LazyVStack(spacing: 12) {
-                            ForEach(lists) { list in
-                                NavigationLink {
-                                    ListDetailView(list: list)
-                                } label: {
-                                    ListCard(list: list)
+                        switch viewMode {
+                        case .carousel:
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(alignment: .top, spacing: 16) {
+                                    ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                                        NavigationLink {
+                                            ListDetailView(list: list)
+                                        } label: {
+                                            ListCarouselCard(list: list)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.horizontal)
+                            }
+
+                        case .grid:
+                            LazyVGrid(columns: [
+                                GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
+                            ], alignment: .leading, spacing: 16) {
+                                ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                                    NavigationLink {
+                                        ListDetailView(list: list)
+                                    } label: {
+                                        ListGridCard(list: list)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal)
+
+                        case .list:
+                            if sortMode == .manual {
+                                // Manual reordering enabled
+                                LazyVStack(spacing: 0) {
+                                    ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                                        NavigationLink {
+                                            ListDetailView(list: list)
+                                        } label: {
+                                            ListRowCard(list: list, showDragHandle: true)
+                                        }
+                                        .buttonStyle(.plain)
+                                        Divider()
+                                    }
+                                    .onMove { source, destination in
+                                        moveList(from: source, to: destination)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            } else {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                                        NavigationLink {
+                                            ListDetailView(list: list)
+                                        } label: {
+                                            ListRowCard(list: list, showDragHandle: false)
+                                        }
+                                        .buttonStyle(.plain)
+                                        Divider()
+                                    }
+                                }
+                                .padding(.horizontal)
                             }
                         }
-                        .padding(.horizontal)
                     }
                 }
                 .padding(.top)
@@ -661,9 +873,12 @@ struct ListsView: View {
                 context: viewContext
             )
 
-            if lists.isEmpty {
+            if allLists.isEmpty {
                 list.isDefault = true
             }
+
+            // Set sortOrder to be at the end
+            list.sortOrder = Int16(allLists.count)
 
             do {
                 try viewContext.save()
@@ -676,9 +891,182 @@ struct ListsView: View {
             newListColor = "007AFF"
         }
     }
+
+    private func moveList(from source: IndexSet, to destination: Int) {
+        var listsArray = filteredAndSortedLists
+        listsArray.move(fromOffsets: source, toOffset: destination)
+
+        // Update sortOrder for all lists
+        for (index, list) in listsArray.enumerated() {
+            list.sortOrder = Int16(index)
+        }
+
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error reordering lists: \(error)")
+        }
+    }
 }
 
-// MARK: - List Card
+// MARK: - List Carousel Card
+
+struct ListCarouselCard: View {
+    @ObservedObject var list: MediaList
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Poster preview
+            if list.titleCount > 0 {
+                ZStack(alignment: .topTrailing) {
+                    if let firstTitle = list.sortedTitles.first {
+                        PosterImageView(posterPath: firstTitle.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
+                            .frame(width: 120, height: 180)
+                            .cornerRadius(8)
+                    }
+
+                    // Shared/Private badge
+                    Image(systemName: list.isShared ? "person.2.fill" : "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(4)
+                        .padding(4)
+                }
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray5))
+                        .frame(width: 120, height: 180)
+
+                    Image(systemName: list.displayIcon)
+                        .font(.largeTitle)
+                        .foregroundStyle(list.displayColor)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(list.displayName)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(2)
+                    .frame(width: 120, alignment: .leading)
+
+                Text("\(list.titleCount) items")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - List Grid Card
+
+struct ListGridCard: View {
+    @ObservedObject var list: MediaList
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                Image(systemName: list.displayIcon)
+                    .foregroundStyle(list.displayColor)
+                    .font(.title3)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(list.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text("\(list.titleCount) items")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: list.isShared ? "person.2.fill" : "lock.fill")
+                    .font(.caption2)
+                    .foregroundStyle(list.isShared ? .blue : .secondary)
+            }
+
+            // Poster Row Preview
+            if list.titleCount > 0 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(list.sortedTitles.prefix(4), id: \.objectID) { title in
+                            PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
+                                .frame(width: 40, height: 60)
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6).opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - List Row Card
+
+struct ListRowCard: View {
+    @ObservedObject var list: MediaList
+    let showDragHandle: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if showDragHandle {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+
+            Image(systemName: list.displayIcon)
+                .foregroundStyle(list.displayColor)
+                .font(.title3)
+                .frame(width: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(list.displayName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text("\(list.titleCount) items")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Poster preview
+            if list.titleCount > 0 {
+                HStack(spacing: 4) {
+                    ForEach(list.sortedTitles.prefix(3), id: \.objectID) { title in
+                        PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
+                            .frame(width: 30, height: 45)
+                            .cornerRadius(3)
+                    }
+                }
+            }
+
+            Image(systemName: list.isShared ? "person.2.fill" : "lock.fill")
+                .font(.caption)
+                .foregroundStyle(list.isShared ? .blue : .secondary)
+
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - List Card (Legacy)
 
 struct ListCard: View {
     @ObservedObject var list: MediaList
