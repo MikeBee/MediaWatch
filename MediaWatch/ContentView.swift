@@ -603,6 +603,57 @@ struct ListCard: View {
 
 // MARK: - List Detail View
 
+// Sort and Group Options
+enum ListSortOption: String, CaseIterable {
+    case added = "added"
+    case updated = "updated"
+    case alpha = "alpha"
+    case year = "year"
+    case stars = "stars"
+
+    var label: String {
+        switch self {
+        case .added: return "Date Added"
+        case .updated: return "Date Updated"
+        case .alpha: return "Alphabetical"
+        case .year: return "Year"
+        case .stars: return "Rating"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .added: return "plus.circle"
+        case .updated: return "clock.arrow.circlepath"
+        case .alpha: return "textformat.abc"
+        case .year: return "calendar"
+        case .stars: return "star"
+        }
+    }
+}
+
+enum ListGroupOption: String, CaseIterable {
+    case none = "none"
+    case likedStatus = "likedStatus"
+    case watchStatus = "watchStatus"
+
+    var label: String {
+        switch self {
+        case .none: return "None"
+        case .likedStatus: return "Liked Status"
+        case .watchStatus: return "Watch Status"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "rectangle.grid.1x2"
+        case .likedStatus: return "hand.thumbsup"
+        case .watchStatus: return "eye"
+        }
+    }
+}
+
 struct ListDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var persistenceController: PersistenceController
@@ -614,8 +665,86 @@ struct ListDetailView: View {
     @State private var isPreparingShare = false
     @State private var shareError: String?
 
+    // Sort, Group, Filter
+    @State private var sortOption: ListSortOption = .added
+    @State private var sortAscending = false
+    @State private var groupOption: ListGroupOption = .none
+    @State private var selectedLikedFilters: Set<Int> = []
+    @State private var selectedWatchFilters: Set<Int16> = []
+    @State private var showFilterSheet = false
+
     enum ViewMode {
         case grid, list
+    }
+
+    // Filtered and sorted titles
+    private var processedTitles: [Title] {
+        var titles = list.sortedTitles
+
+        // Apply filters
+        if !selectedLikedFilters.isEmpty {
+            titles = titles.filter { selectedLikedFilters.contains(Int($0.likedStatus)) }
+        }
+        if !selectedWatchFilters.isEmpty {
+            titles = titles.filter { selectedWatchFilters.contains($0.watchStatus) }
+        }
+
+        // Apply sorting
+        titles = titles.sorted { first, second in
+            let result: Bool
+            switch sortOption {
+            case .added:
+                result = (first.dateAdded ?? Date.distantPast) > (second.dateAdded ?? Date.distantPast)
+            case .updated:
+                result = (first.dateModified ?? Date.distantPast) > (second.dateModified ?? Date.distantPast)
+            case .alpha:
+                result = (first.title ?? "") < (second.title ?? "")
+            case .year:
+                result = first.year > second.year
+            case .stars:
+                result = first.userRating > second.userRating
+            }
+            return sortAscending ? !result : result
+        }
+
+        return titles
+    }
+
+    // Grouped titles
+    private var groupedTitles: [(key: String, titles: [Title])] {
+        let titles = processedTitles
+
+        switch groupOption {
+        case .none:
+            return [("", titles)]
+        case .likedStatus:
+            let grouped = Dictionary(grouping: titles) { title in
+                LikedStatus(rawValue: Int(title.likedStatus))?.displayName ?? "Unknown"
+            }
+            // Sort groups: Liked, Neutral, Disliked
+            let order = ["Liked", "Neutral", "Disliked"]
+            return grouped.sorted { first, second in
+                let firstIndex = order.firstIndex(of: first.key) ?? 99
+                let secondIndex = order.firstIndex(of: second.key) ?? 99
+                return firstIndex < secondIndex
+            }.map { (key: $0.key, titles: $0.value) }
+        case .watchStatus:
+            let grouped = Dictionary(grouping: titles) { title in
+                WatchStatus(rawValue: title.watchStatus)?.label ?? "Unknown"
+            }
+            // Sort groups by watch status order
+            let order = ["Current", "Waiting", "New", "Haven't Started", "Maybe"]
+            return grouped.sorted { first, second in
+                let firstIndex = order.firstIndex(of: first.key) ?? 99
+                let secondIndex = order.firstIndex(of: second.key) ?? 99
+                return firstIndex < secondIndex
+            }.map { (key: $0.key, titles: $0.value) }
+        }
+    }
+
+    // Active filter count
+    private var activeFilterCount: Int {
+        selectedLikedFilters.count + selectedWatchFilters.count
     }
 
     var body: some View {
@@ -626,31 +755,70 @@ struct ListDetailView: View {
                 } description: {
                     Text("Search for titles to add to this list")
                 }
+            } else if processedTitles.isEmpty {
+                ContentUnavailableView {
+                    Label("No Results", systemImage: "line.3.horizontal.decrease.circle")
+                } description: {
+                    Text("No titles match your current filters")
+                } actions: {
+                    Button("Clear Filters") {
+                        selectedLikedFilters.removeAll()
+                        selectedWatchFilters.removeAll()
+                    }
+                }
             } else {
                 ScrollView {
                     if viewMode == .grid {
-                        LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 16)
-                        ], spacing: 16) {
-                            ForEach(list.sortedTitles, id: \.objectID) { title in
-                                NavigationLink {
-                                    TitleDetailView(title: title)
-                                } label: {
-                                    TitleGridItem(title: title)
+                        LazyVStack(alignment: .leading, spacing: 20) {
+                            ForEach(groupedTitles, id: \.key) { group in
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Group header
+                                    if !group.key.isEmpty {
+                                        Text(group.key)
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal)
+                                    }
+
+                                    LazyVGrid(columns: [
+                                        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 16)
+                                    ], spacing: 16) {
+                                        ForEach(group.titles, id: \.objectID) { title in
+                                            NavigationLink {
+                                                TitleDetailView(title: title)
+                                            } label: {
+                                                TitleGridItem(title: title)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .padding(.horizontal)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
-                        .padding()
+                        .padding(.vertical)
                     } else {
-                        LazyVStack(spacing: 12) {
-                            ForEach(list.sortedTitles, id: \.objectID) { title in
-                                NavigationLink {
-                                    TitleDetailView(title: title)
-                                } label: {
-                                    TitleListRow(title: title)
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(groupedTitles, id: \.key) { group in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    // Group header
+                                    if !group.key.isEmpty {
+                                        Text(group.key)
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal)
+                                            .padding(.top, 8)
+                                    }
+
+                                    ForEach(group.titles, id: \.objectID) { title in
+                                        NavigationLink {
+                                            TitleDetailView(title: title)
+                                        } label: {
+                                            TitleListRow(title: title)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
@@ -663,36 +831,75 @@ struct ListDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    // View mode
-                    Button {
-                        viewMode = .grid
-                    } label: {
-                        Label("Grid View", systemImage: "square.grid.2x2")
-                    }
-                    Button {
-                        viewMode = .list
-                    } label: {
-                        Label("List View", systemImage: "list.bullet")
-                    }
-
-                    Divider()
-
-                    // CloudKit Sharing
-                    Button {
-                        Task {
-                            await prepareShare()
+                    // Sort options
+                    Section("Sort By") {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(ListSortOption.allCases, id: \.self) { option in
+                                Label(option.label, systemImage: option.icon)
+                                    .tag(option)
+                            }
                         }
-                    } label: {
-                        if isPreparingShare {
-                            Label("Preparing...", systemImage: "hourglass")
-                        } else {
+
+                        Button {
+                            sortAscending.toggle()
+                        } label: {
                             Label(
-                                persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
-                                systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
+                                sortAscending ? "Ascending" : "Descending",
+                                systemImage: sortAscending ? "arrow.up" : "arrow.down"
                             )
                         }
                     }
-                    .disabled(isPreparingShare)
+
+                    // Group options
+                    Section("Group By") {
+                        Picker("Group", selection: $groupOption) {
+                            ForEach(ListGroupOption.allCases, id: \.self) { option in
+                                Label(option.label, systemImage: option.icon)
+                                    .tag(option)
+                            }
+                        }
+                    }
+
+                    Section {
+                        // Filter
+                        Button {
+                            showFilterSheet = true
+                        } label: {
+                            Label(
+                                activeFilterCount > 0 ? "Filter (\(activeFilterCount))" : "Filter",
+                                systemImage: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                            )
+                        }
+                    }
+
+                    Section {
+                        // View mode
+                        Button {
+                            viewMode = viewMode == .grid ? .list : .grid
+                        } label: {
+                            Label(
+                                viewMode == .grid ? "List View" : "Grid View",
+                                systemImage: viewMode == .grid ? "list.bullet" : "square.grid.2x2"
+                            )
+                        }
+
+                        // CloudKit Sharing
+                        Button {
+                            Task {
+                                await prepareShare()
+                            }
+                        } label: {
+                            if isPreparingShare {
+                                Label("Preparing...", systemImage: "hourglass")
+                            } else {
+                                Label(
+                                    persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
+                                    systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
+                                )
+                            }
+                        }
+                        .disabled(isPreparingShare)
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -715,6 +922,12 @@ struct ListDetailView: View {
             if let error = shareError {
                 Text(error)
             }
+        }
+        .sheet(isPresented: $showFilterSheet) {
+            FilterSheetView(
+                selectedLikedFilters: $selectedLikedFilters,
+                selectedWatchFilters: $selectedWatchFilters
+            )
         }
     }
 
@@ -746,6 +959,87 @@ struct ListDetailView: View {
                 shareError = "Failed to create share: \(error.localizedDescription)"
             }
         }
+    }
+}
+
+// MARK: - Filter Sheet View
+
+struct FilterSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedLikedFilters: Set<Int>
+    @Binding var selectedWatchFilters: Set<Int16>
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // Liked Status Filters
+                Section("Liked Status") {
+                    ForEach(LikedStatus.allCases, id: \.rawValue) { status in
+                        Button {
+                            if selectedLikedFilters.contains(status.rawValue) {
+                                selectedLikedFilters.remove(status.rawValue)
+                            } else {
+                                selectedLikedFilters.insert(status.rawValue)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: status.systemImage)
+                                    .foregroundStyle(status == .liked ? .green : status == .disliked ? .red : .secondary)
+                                Text(status == .liked ? "Yes" : status == .disliked ? "No" : "Maybe")
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedLikedFilters.contains(status.rawValue) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.accentColor)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Watch Status Filters
+                Section("Watch Status") {
+                    ForEach(WatchStatus.allCases, id: \.rawValue) { status in
+                        Button {
+                            if selectedWatchFilters.contains(status.rawValue) {
+                                selectedWatchFilters.remove(status.rawValue)
+                            } else {
+                                selectedWatchFilters.insert(status.rawValue)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: status.icon)
+                                    .foregroundStyle(status.color)
+                                Text(status.label)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedWatchFilters.contains(status.rawValue) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.accentColor)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Filter")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear All") {
+                        selectedLikedFilters.removeAll()
+                        selectedWatchFilters.removeAll()
+                    }
+                    .disabled(selectedLikedFilters.isEmpty && selectedWatchFilters.isEmpty)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
