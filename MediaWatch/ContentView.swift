@@ -608,7 +608,8 @@ enum ListSortOption: String, CaseIterable {
     case added = "added"
     case updated = "updated"
     case alpha = "alpha"
-    case year = "year"
+    case started = "started"
+    case lastWatched = "lastWatched"
     case stars = "stars"
 
     var label: String {
@@ -616,7 +617,8 @@ enum ListSortOption: String, CaseIterable {
         case .added: return "Date Added"
         case .updated: return "Date Updated"
         case .alpha: return "Alphabetical"
-        case .year: return "Year"
+        case .started: return "Started"
+        case .lastWatched: return "Last Watched"
         case .stars: return "Rating"
         }
     }
@@ -626,7 +628,8 @@ enum ListSortOption: String, CaseIterable {
         case .added: return "plus.circle"
         case .updated: return "clock.arrow.circlepath"
         case .alpha: return "textformat.abc"
-        case .year: return "calendar"
+        case .started: return "calendar"
+        case .lastWatched: return "eye"
         case .stars: return "star"
         }
     }
@@ -703,10 +706,14 @@ struct ListDetailView: View {
                 result = (first.dateModified ?? Date.distantPast) > (second.dateModified ?? Date.distantPast)
             case .alpha:
                 result = (first.title ?? "") < (second.title ?? "")
-            case .year:
-                result = first.year > second.year
+            case .started:
+                result = (first.startDate ?? Date.distantPast) > (second.startDate ?? Date.distantPast)
+            case .lastWatched:
+                result = (first.lastWatched ?? Date.distantPast) > (second.lastWatched ?? Date.distantPast)
             case .stars:
-                result = first.userRating > second.userRating
+                let firstAvg = (first.lauraRating + first.mikeRating) / 2.0
+                let secondAvg = (second.lauraRating + second.mikeRating) / 2.0
+                result = firstAvg > secondAvg
             }
             return sortAscending ? !result : result
         }
@@ -1199,12 +1206,14 @@ struct TitleListRow: View {
 struct TitleDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var title: Title
 
     @State private var showingNotesEditor = false
     @State private var showingListManager = false
     @State private var expandedSynopsis = false
     @State private var expandedSeasons: Set<Int> = []
+    @State private var allSeasonsHidden = true
     @State private var isLoadingEpisodes = false
     @State private var episodeLoadError: String?
     @State private var showingDeleteConfirmation = false
@@ -1227,6 +1236,9 @@ struct TitleDetailView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         // Watch Status
                         watchStatusSection
+
+                        // Dates Section (Started and Last Watched)
+                        datesSection
 
                         // Ratings
                         ratingsSection
@@ -1413,6 +1425,34 @@ struct TitleDetailView: View {
         }
     }
 
+    // MARK: - Dates Section
+
+    private var datesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if title.startDate != nil || title.lastWatched != nil {
+                if let startDate = title.startDate {
+                    HStack {
+                        Text("Started")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(startDate.formatted(date: .abbreviated, time: .omitted))
+                    }
+                    .font(.subheadline)
+                }
+
+                if let lastWatched = title.lastWatched {
+                    HStack {
+                        Text("Last Watched")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(lastWatched.formatted(date: .abbreviated, time: .omitted))
+                    }
+                    .font(.subheadline)
+                }
+            }
+        }
+    }
+
     // MARK: - Ratings Section
 
     private var ratingsSection: some View {
@@ -1468,6 +1508,7 @@ struct TitleDetailView: View {
                             : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
+                                .font(.title2)
                                 .foregroundStyle(.yellow)
                         }
                         Spacer()
@@ -1487,35 +1528,12 @@ struct TitleDetailView: View {
                 .font(.headline)
 
             VStack(spacing: 8) {
-                // Genres
-                if let genres = title.genres, !genres.isEmpty {
-                    InfoRow(label: "Genres", value: genres.joined(separator: ", "))
-                }
-
-                // Runtime or Seasons
-                if title.mediaType == "movie" {
-                    if title.runtime > 0 {
-                        InfoRow(label: "Runtime", value: "\(title.runtime) min")
-                    }
-                } else {
-                    if title.numberOfSeasons > 0 {
-                        InfoRow(label: "Seasons", value: "\(title.numberOfSeasons)")
-                    }
-                    if title.numberOfEpisodes > 0 {
-                        InfoRow(label: "Episodes", value: "\(title.numberOfEpisodes)")
-                    }
-                }
-
-                // Status
-                if let status = title.status, !status.isEmpty {
-                    InfoRow(label: "Status", value: status)
-                }
-
-                // Media Category (for TV)
+                // Media Category (for TV) - at top with bold styling
                 if title.mediaType == "tv" {
                     HStack {
-                        Text("Type")
-                            .foregroundStyle(.secondary)
+                        Text("Category")
+                            .fontWeight(.bold)
+                            .foregroundStyle(colorScheme == .dark ? .orange : .blue)
                         Spacer()
                         Menu {
                             Button("None") {
@@ -1540,20 +1558,35 @@ struct TitleDetailView: View {
                             }
                         } label: {
                             Text(title.mediaCategory ?? "Select")
-                                .foregroundStyle(title.mediaCategory == nil ? .secondary : .primary)
+                                .fontWeight(.bold)
+                                .foregroundStyle(title.mediaCategory == nil ? .secondary : (colorScheme == .dark ? .orange : .blue))
                         }
                     }
                     .font(.subheadline)
                 }
 
-                // Start Date
-                if let startDate = title.startDate {
-                    InfoRow(label: "Started", value: startDate.formatted(date: .abbreviated, time: .omitted))
+                // Genres
+                if let genres = title.genres, !genres.isEmpty {
+                    InfoRow(label: "Genres", value: genres.joined(separator: ", "))
                 }
 
-                // Last Watched
-                if let lastWatched = title.lastWatched {
-                    InfoRow(label: "Last Watched", value: lastWatched.formatted(date: .abbreviated, time: .omitted))
+                // Runtime or Seasons
+                if title.mediaType == "movie" {
+                    if title.runtime > 0 {
+                        InfoRow(label: "Runtime", value: "\(title.runtime) min")
+                    }
+                } else {
+                    if title.numberOfSeasons > 0 {
+                        InfoRow(label: "Seasons", value: "\(title.numberOfSeasons)")
+                    }
+                    if title.numberOfEpisodes > 0 {
+                        InfoRow(label: "Episodes", value: "\(title.numberOfEpisodes)")
+                    }
+                }
+
+                // Status
+                if let status = title.status, !status.isEmpty {
+                    InfoRow(label: "Status", value: status)
                 }
 
                 // Vote Average
@@ -2009,6 +2042,7 @@ struct TitleDetailView: View {
                 HStack {
                     Button {
                         withAnimation {
+                            allSeasonsHidden = false
                             expandedSeasons = Set(seasons.map { $0.key })
                         }
                     } label: {
@@ -2020,6 +2054,7 @@ struct TitleDetailView: View {
 
                     Button {
                         withAnimation {
+                            allSeasonsHidden = true
                             expandedSeasons.removeAll()
                         }
                     } label: {
@@ -2033,7 +2068,8 @@ struct TitleDetailView: View {
                 }
                 .padding(.bottom, 4)
 
-                ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
+                if !allSeasonsHidden {
+                    ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
                     VStack(spacing: 0) {
                         // Season header
                         Button {
@@ -2125,6 +2161,7 @@ struct TitleDetailView: View {
                                             Button {
                                                 episode.isStarred.toggle()
                                                 try? viewContext.save()
+                                                episodeRefreshTrigger.toggle()
                                             } label: {
                                                 Image(systemName: episode.isStarred ? "star.fill" : "star")
                                                     .font(.caption)
@@ -2169,6 +2206,7 @@ struct TitleDetailView: View {
                     .padding(.vertical, 4)
                     .background(Color(.systemGray6).opacity(0.3))
                     .cornerRadius(8)
+                    }
                 }
             }
 
