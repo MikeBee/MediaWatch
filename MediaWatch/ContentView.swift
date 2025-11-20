@@ -1351,10 +1351,24 @@ struct TitleDetailView: View {
 
                 // Title and Year
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title.title ?? "Unknown")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .lineLimit(3)
+                    HStack(alignment: .top) {
+                        Text(title.title ?? "Unknown")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .lineLimit(3)
+
+                        Spacer()
+
+                        // Favorite star
+                        Button {
+                            title.isFavorite.toggle()
+                            try? viewContext.save()
+                        } label: {
+                            Image(systemName: title.isFavorite ? "star.fill" : "star")
+                                .font(.title2)
+                                .foregroundStyle(title.isFavorite ? .yellow : .secondary)
+                        }
+                    }
 
                     if title.year > 0 {
                         Text(String(title.year))
@@ -1370,8 +1384,6 @@ struct TitleDetailView: View {
                         .background(Color.accentColor.opacity(0.3))
                         .cornerRadius(4)
                 }
-
-                Spacer()
             }
             .padding()
         }
@@ -1543,9 +1555,49 @@ struct TitleDetailView: View {
                     InfoRow(label: "Status", value: status)
                 }
 
+                // Media Category (for TV)
+                if title.mediaType == "tv" {
+                    HStack {
+                        Text("Type")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Menu {
+                            Button("None") {
+                                title.mediaCategory = nil
+                                try? viewContext.save()
+                            }
+                            Button("Series") {
+                                title.mediaCategory = "Series"
+                                try? viewContext.save()
+                            }
+                            Button("Limited Series") {
+                                title.mediaCategory = "Limited Series"
+                                try? viewContext.save()
+                            }
+                            Button("TV Show") {
+                                title.mediaCategory = "TV Show"
+                                try? viewContext.save()
+                            }
+                            Button("TV Movie") {
+                                title.mediaCategory = "TV Movie"
+                                try? viewContext.save()
+                            }
+                        } label: {
+                            Text(title.mediaCategory ?? "Select")
+                                .foregroundStyle(title.mediaCategory == nil ? .secondary : .primary)
+                        }
+                    }
+                    .font(.subheadline)
+                }
+
+                // Start Date
+                if let startDate = title.startDate {
+                    InfoRow(label: "Started", value: startDate.formatted(date: .abbreviated, time: .omitted))
+                }
+
                 // Last Watched
-                if let watchedDate = title.watchedDate {
-                    InfoRow(label: "Last Watched", value: watchedDate.formatted(date: .abbreviated, time: .omitted))
+                if let lastWatched = title.lastWatched {
+                    InfoRow(label: "Last Watched", value: lastWatched.formatted(date: .abbreviated, time: .omitted))
                 }
 
                 // Vote Average
@@ -2063,6 +2115,13 @@ struct TitleDetailView: View {
                                             ep.watchedDate = Date()
                                         }
                                     }
+                                    // Update date tracking
+                                    if !allWatched {
+                                        title.lastWatched = Date()
+                                        if title.startDate == nil {
+                                            title.startDate = Date()
+                                        }
+                                    }
                                     // Update title to trigger UI refresh
                                     title.dateModified = Date()
                                     title.objectWillChange.send()
@@ -2088,6 +2147,12 @@ struct TitleDetailView: View {
                                                 episode.watched.toggle()
                                                 if episode.watched {
                                                     episode.watchedDate = Date()
+                                                    // Update lastWatched
+                                                    title.lastWatched = Date()
+                                                    // Set startDate if not already set
+                                                    if title.startDate == nil {
+                                                        title.startDate = Date()
+                                                    }
                                                 }
                                                 // Update title to trigger UI refresh
                                                 title.dateModified = Date()
@@ -2097,6 +2162,17 @@ struct TitleDetailView: View {
                                             } label: {
                                                 Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
                                                     .foregroundStyle(episode.watched ? .green : .secondary)
+                                            }
+                                            .buttonStyle(.plain)
+
+                                            // Episode star
+                                            Button {
+                                                episode.isStarred.toggle()
+                                                try? viewContext.save()
+                                            } label: {
+                                                Image(systemName: episode.isStarred ? "star.fill" : "star")
+                                                    .font(.caption)
+                                                    .foregroundStyle(episode.isStarred ? .yellow : .secondary)
                                             }
                                             .buttonStyle(.plain)
 
