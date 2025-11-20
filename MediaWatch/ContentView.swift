@@ -80,38 +80,38 @@ enum Tab: Hashable {
 
 enum WatchStatus: Int16, CaseIterable {
     case current = 0
-    case waiting = 1
-    case new = 2
-    case haventStarted = 3
-    case maybe = 4
+    case new = 1
+    case paused = 2
+    case maybe = 3
+    case finished = 4
 
     var label: String {
         switch self {
         case .current: return "Current"
-        case .waiting: return "Waiting"
         case .new: return "New"
-        case .haventStarted: return "Haven't Started"
+        case .paused: return "Paused"
         case .maybe: return "Maybe"
+        case .finished: return "Finished"
         }
     }
 
     var icon: String {
         switch self {
         case .current: return "play.circle.fill"
-        case .waiting: return "clock.fill"
         case .new: return "sparkles"
-        case .haventStarted: return "circle"
+        case .paused: return "pause.circle.fill"
         case .maybe: return "questionmark.circle"
+        case .finished: return "checkmark.circle.fill"
         }
     }
 
     var color: Color {
         switch self {
         case .current: return .blue
-        case .waiting: return .orange
         case .new: return .green
-        case .haventStarted: return .secondary
+        case .paused: return .orange
         case .maybe: return .purple
+        case .finished: return .gray
         }
     }
 }
@@ -197,14 +197,6 @@ struct HomeView: View {
     )
     private var currentTitles: FetchedResults<Title>
 
-    // Fetch Waiting titles
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.waiting.rawValue),
-        animation: .default
-    )
-    private var waitingTitles: FetchedResults<Title>
-
     // Fetch New titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
@@ -213,13 +205,13 @@ struct HomeView: View {
     )
     private var newTitles: FetchedResults<Title>
 
-    // Fetch Haven't Started titles
+    // Fetch Paused titles
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
-        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.haventStarted.rawValue),
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.paused.rawValue),
         animation: .default
     )
-    private var haventStartedTitles: FetchedResults<Title>
+    private var pausedTitles: FetchedResults<Title>
 
     // Fetch Maybe titles
     @FetchRequest(
@@ -228,6 +220,14 @@ struct HomeView: View {
         animation: .default
     )
     private var maybeTitles: FetchedResults<Title>
+
+    // Fetch Finished titles
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.finished.rawValue),
+        animation: .default
+    )
+    private var finishedTitles: FetchedResults<Title>
 
     var body: some View {
         NavigationStack {
@@ -243,15 +243,6 @@ struct HomeView: View {
                         )
                     }
 
-                    // Waiting Section
-                    if !waitingTitles.isEmpty {
-                        statusSection(
-                            status: .waiting,
-                            titles: Array(waitingTitles),
-                            useCarousel: true
-                        )
-                    }
-
                     // New Section
                     if !newTitles.isEmpty {
                         statusSection(
@@ -261,11 +252,11 @@ struct HomeView: View {
                         )
                     }
 
-                    // Haven't Started Section
-                    if !haventStartedTitles.isEmpty {
+                    // Paused Section
+                    if !pausedTitles.isEmpty {
                         statusSection(
-                            status: .haventStarted,
-                            titles: Array(haventStartedTitles),
+                            status: .paused,
+                            titles: Array(pausedTitles),
                             useCarousel: true
                         )
                     }
@@ -279,8 +270,17 @@ struct HomeView: View {
                         )
                     }
 
+                    // Finished Section
+                    if !finishedTitles.isEmpty {
+                        statusSection(
+                            status: .finished,
+                            titles: Array(finishedTitles),
+                            useCarousel: true
+                        )
+                    }
+
                     // Empty State
-                    if currentTitles.isEmpty && waitingTitles.isEmpty && newTitles.isEmpty && haventStartedTitles.isEmpty && maybeTitles.isEmpty {
+                    if currentTitles.isEmpty && newTitles.isEmpty && pausedTitles.isEmpty && maybeTitles.isEmpty && finishedTitles.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "film.stack")
                                 .font(.system(size: 60))
@@ -741,7 +741,7 @@ struct ListDetailView: View {
                 WatchStatus(rawValue: title.watchStatus)?.label ?? "Unknown"
             }
             // Sort groups by watch status order
-            let order = ["Current", "Waiting", "New", "Haven't Started", "Maybe"]
+            let order = ["Current", "New", "Paused", "Maybe", "Finished"]
             return grouped.sorted { first, second in
                 let firstIndex = order.firstIndex(of: first.key) ?? 99
                 let secondIndex = order.firstIndex(of: second.key) ?? 99
@@ -1141,7 +1141,7 @@ struct TitleGridItem: View {
                         }
                         Spacer()
                         // Watch status icon at top right
-                        let status = WatchStatus(rawValue: title.watchStatus) ?? .haventStarted
+                        let status = WatchStatus(rawValue: title.watchStatus) ?? .new
                         Image(systemName: status.icon)
                             .font(.caption)
                             .foregroundStyle(status.color)
@@ -2260,7 +2260,7 @@ struct TitleDetailView: View {
     // MARK: - Action Bar
 
     private var actionBar: some View {
-        let currentStatus = WatchStatus(rawValue: title.watchStatus) ?? .haventStarted
+        let currentStatus = WatchStatus(rawValue: title.watchStatus) ?? .new
 
         return HStack(spacing: 0) {
             // Watch Status - cycles through statuses
@@ -2268,14 +2268,14 @@ struct TitleDetailView: View {
                 let nextStatus: WatchStatus
                 switch currentStatus {
                 case .current:
-                    nextStatus = .waiting
-                case .waiting:
                     nextStatus = .new
                 case .new:
-                    nextStatus = .haventStarted
-                case .haventStarted:
+                    nextStatus = .paused
+                case .paused:
                     nextStatus = .maybe
                 case .maybe:
+                    nextStatus = .finished
+                case .finished:
                     nextStatus = .current
                 }
                 title.watchStatus = nextStatus.rawValue
