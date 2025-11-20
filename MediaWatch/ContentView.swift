@@ -1169,13 +1169,6 @@ struct TitleListRow: View {
                             .foregroundStyle(.white)
                             .cornerRadius(3)
                     }
-                    if title.likedStatus == 1 {
-                        Image(systemName: "hand.thumbsup.fill")
-                            .foregroundStyle(.green)
-                    } else if title.likedStatus == -1 {
-                        Image(systemName: "hand.thumbsdown.fill")
-                            .foregroundStyle(.red)
-                    }
                 }
                 .font(.caption)
             }
@@ -1236,8 +1229,8 @@ struct TitleDetailView: View {
                         // Watch Status
                         watchStatusSection
 
-                        // Liked Status Toggle
-                        likedStatusSection
+                        // Ratings
+                        ratingsSection
 
                         // Basic Info
                         basicInfoSection
@@ -1421,47 +1414,12 @@ struct TitleDetailView: View {
         }
     }
 
-    // MARK: - Liked Status Section
+    // MARK: - Ratings Section
 
-    private var likedStatusSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Yes/No/Maybe buttons
-            HStack(spacing: 16) {
-                LikeButton(
-                    icon: "hand.thumbsup.fill",
-                    label: "Yes",
-                    isSelected: title.likedStatus == 1,
-                    color: .green
-                ) {
-                    title.likedStatus = title.likedStatus == 1 ? 0 : 1
-                    try? viewContext.save()
-                }
-
-                LikeButton(
-                    icon: "hand.thumbsdown.fill",
-                    label: "No",
-                    isSelected: title.likedStatus == -1,
-                    color: .red
-                ) {
-                    title.likedStatus = title.likedStatus == -1 ? 0 : -1
-                    try? viewContext.save()
-                }
-
-                LikeButton(
-                    icon: "minus",
-                    label: "Maybe",
-                    isSelected: title.likedStatus == 0,
-                    color: .gray
-                ) {
-                    title.likedStatus = 0
-                    try? viewContext.save()
-                }
-            }
-
-            // Ratings Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Ratings")
-                    .font(.headline)
+    private var ratingsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ratings")
+                .font(.headline)
 
                 // Laura Rating
                 HStack {
@@ -1520,7 +1478,6 @@ struct TitleDetailView: View {
                     }
                 }
             }
-        }
     }
 
     // MARK: - Basic Info Section
@@ -2401,31 +2358,6 @@ struct TitleDetailView: View {
 
 // MARK: - Supporting Views
 
-struct LikeButton: View {
-    let icon: String
-    let label: String
-    let isSelected: Bool
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title2)
-                Text(label)
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(isSelected ? color.opacity(0.2) : Color(.systemGray6).opacity(0.5))
-            .foregroundStyle(isSelected ? color : .secondary)
-            .cornerRadius(12)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct InfoRow: View {
     let label: String
     let value: String
@@ -2743,11 +2675,12 @@ enum MediaTypeFilter: String, CaseIterable {
     case tv = "TV Shows"
 }
 
-enum LikedStatusFilter: String, CaseIterable {
+enum MediaCategoryFilter: String, CaseIterable {
     case all = "All"
-    case liked = "Yes"
-    case disliked = "No"
-    case maybe = "Maybe"
+    case series = "Series"
+    case limitedSeries = "Limited Series"
+    case tvShow = "TV Show"
+    case tvMovie = "TV Movie"
 }
 
 struct SearchView: View {
@@ -2769,7 +2702,7 @@ struct SearchView: View {
     // Library search filters
     @State private var searchMode: SearchMode = .tmdb
     @State private var mediaTypeFilter: MediaTypeFilter = .all
-    @State private var likedStatusFilter: LikedStatusFilter = .all
+    @State private var mediaCategoryFilter: MediaCategoryFilter = .all
 
     // Filtered library results
     private var filteredLibraryResults: [Title] {
@@ -2781,16 +2714,9 @@ struct SearchView: View {
             results = results.filter { $0.mediaType == filterValue }
         }
 
-        // Apply liked status filter
-        if likedStatusFilter != .all {
-            let statusValue: Int16
-            switch likedStatusFilter {
-            case .liked: statusValue = 1
-            case .disliked: statusValue = 2
-            case .maybe: statusValue = 3
-            case .all: statusValue = 0
-            }
-            results = results.filter { $0.likedStatus == statusValue }
+        // Apply media category filter
+        if mediaCategoryFilter != .all {
+            results = results.filter { $0.mediaCategory == mediaCategoryFilter.rawValue }
         }
 
         // Apply search text
@@ -2866,13 +2792,13 @@ struct SearchView: View {
                             }
 
                             Menu {
-                                ForEach(LikedStatusFilter.allCases, id: \.self) { filter in
+                                ForEach(MediaCategoryFilter.allCases, id: \.self) { filter in
                                     Button {
-                                        likedStatusFilter = filter
+                                        mediaCategoryFilter = filter
                                     } label: {
                                         HStack {
                                             Text(filter.rawValue)
-                                            if likedStatusFilter == filter {
+                                            if mediaCategoryFilter == filter {
                                                 Image(systemName: "checkmark")
                                             }
                                         }
@@ -2880,8 +2806,8 @@ struct SearchView: View {
                                 }
                             } label: {
                                 HStack {
-                                    Image(systemName: "hand.thumbsup")
-                                    Text(likedStatusFilter.rawValue)
+                                    Image(systemName: "tv")
+                                    Text(mediaCategoryFilter.rawValue)
                                     Image(systemName: "chevron.down")
                                 }
                                 .font(.subheadline)
@@ -3121,21 +3047,6 @@ struct LibrarySearchRow: View {
                         Text(String(title.year))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    }
-
-                    // Liked status indicator
-                    if title.likedStatus == 1 {
-                        Image(systemName: "hand.thumbsup.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    } else if title.likedStatus == 2 {
-                        Image(systemName: "hand.thumbsdown.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    } else if title.likedStatus == 3 {
-                        Image(systemName: "hand.raised.fill")
-                            .font(.caption)
-                            .foregroundStyle(.yellow)
                     }
                 }
 
