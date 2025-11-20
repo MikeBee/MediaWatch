@@ -1029,7 +1029,7 @@ struct LikedFilterRow: View {
                 Spacer()
                 if selectedFilters.contains(status.rawValue) {
                     Image(systemName: "checkmark")
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
@@ -1056,7 +1056,7 @@ struct WatchFilterRow: View {
                 Spacer()
                 if selectedFilters.contains(status.rawValue) {
                     Image(systemName: "checkmark")
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
