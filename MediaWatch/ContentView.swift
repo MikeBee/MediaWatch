@@ -4589,8 +4589,45 @@ struct ProfileView: View {
                     }
                 }
 
-                // Data Section
-                Section("Data") {
+                // Backup & Restore Section
+                Section {
+                    Button {
+                        Task {
+                            await createBackup()
+                        }
+                    } label: {
+                        HStack {
+                            Label("Create Backup", systemImage: "arrow.up.doc")
+                            Spacer()
+                            if isBackingUp {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                    }
+                    .disabled(isBackingUp || isRestoring)
+
+                    Button {
+                        showingRestoreImporter = true
+                    } label: {
+                        HStack {
+                            Label("Restore from Backup", systemImage: "arrow.down.doc")
+                            Spacer()
+                            if isRestoring {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                    }
+                    .disabled(isBackingUp || isRestoring)
+                } header: {
+                    Text("Backup & Restore")
+                } footer: {
+                    Text("Create a complete backup of all your data including titles, lists, episodes, and ratings. Backups are saved as JSON files.")
+                }
+
+                // Data Export/Import Section
+                Section {
                     Button {
                         Task {
                             await createBackup()
@@ -4620,6 +4657,10 @@ struct ProfileView: View {
                         }
                     }
                     .disabled(isBackingUp || isRestoring)
+                } header: {
+                    Text("Data Export/Import")
+                } footer: {
+                    Text("Export your data to JSON format for sharing or archiving. Import JSON files to add data to your library.")
                 }
 
                 // Help Section
