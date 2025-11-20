@@ -974,51 +974,15 @@ struct FilterSheetView: View {
             List {
                 // Liked Status Filters
                 Section("Liked Status") {
-                    ForEach(LikedStatus.allCases, id: \.rawValue) { status in
-                        Button {
-                            if selectedLikedFilters.contains(status.rawValue) {
-                                selectedLikedFilters.remove(status.rawValue)
-                            } else {
-                                selectedLikedFilters.insert(status.rawValue)
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: status.systemImage)
-                                    .foregroundStyle(status == .liked ? .green : status == .disliked ? .red : .secondary)
-                                Text(status == .liked ? "Yes" : status == .disliked ? "No" : "Maybe")
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if selectedLikedFilters.contains(status.rawValue) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.accentColor)
-                                }
-                            }
-                        }
-                    }
+                    LikedFilterRow(status: .liked, label: "Yes", color: .green, selectedFilters: $selectedLikedFilters)
+                    LikedFilterRow(status: .neutral, label: "Maybe", color: .secondary, selectedFilters: $selectedLikedFilters)
+                    LikedFilterRow(status: .disliked, label: "No", color: .red, selectedFilters: $selectedLikedFilters)
                 }
 
                 // Watch Status Filters
                 Section("Watch Status") {
                     ForEach(WatchStatus.allCases, id: \.rawValue) { status in
-                        Button {
-                            if selectedWatchFilters.contains(status.rawValue) {
-                                selectedWatchFilters.remove(status.rawValue)
-                            } else {
-                                selectedWatchFilters.insert(status.rawValue)
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: status.icon)
-                                    .foregroundStyle(status.color)
-                                Text(status.label)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if selectedWatchFilters.contains(status.rawValue) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.accentColor)
-                                }
-                            }
-                        }
+                        WatchFilterRow(status: status, selectedFilters: $selectedWatchFilters)
                     }
                 }
             }
@@ -1040,6 +1004,62 @@ struct FilterSheetView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+struct LikedFilterRow: View {
+    let status: LikedStatus
+    let label: String
+    let color: Color
+    @Binding var selectedFilters: Set<Int>
+
+    var body: some View {
+        Button {
+            if selectedFilters.contains(status.rawValue) {
+                selectedFilters.remove(status.rawValue)
+            } else {
+                selectedFilters.insert(status.rawValue)
+            }
+        } label: {
+            HStack {
+                Image(systemName: status.systemImage)
+                    .foregroundStyle(color)
+                Text(label)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if selectedFilters.contains(status.rawValue) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.accentColor)
+                }
+            }
+        }
+    }
+}
+
+struct WatchFilterRow: View {
+    let status: WatchStatus
+    @Binding var selectedFilters: Set<Int16>
+
+    var body: some View {
+        Button {
+            if selectedFilters.contains(status.rawValue) {
+                selectedFilters.remove(status.rawValue)
+            } else {
+                selectedFilters.insert(status.rawValue)
+            }
+        } label: {
+            HStack {
+                Image(systemName: status.icon)
+                    .foregroundStyle(status.color)
+                Text(status.label)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if selectedFilters.contains(status.rawValue) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.accentColor)
+                }
+            }
+        }
     }
 }
 
