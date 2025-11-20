@@ -409,6 +409,7 @@ struct HomeView: View {
                                     .fontWeight(.medium)
                                     .lineLimit(2)
                             }
+                            .frame(maxHeight: .infinity, alignment: .top)
                         }
                         .buttonStyle(.plain)
                     }
@@ -952,6 +953,7 @@ struct ListGridCard: View {
         .padding(12)
         .background(Color(.systemGray6).opacity(0.5))
         .cornerRadius(12)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -1590,6 +1592,7 @@ struct TitleGridItem: View {
                 .fontWeight(.medium)
                 .lineLimit(2)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -3780,6 +3783,7 @@ struct TrendingCard: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
