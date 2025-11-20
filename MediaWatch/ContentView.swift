@@ -412,7 +412,7 @@ struct RecentlyWatchedRow: View {
                     Text(title.mediaType == "movie" ? "Movie" : "TV Show")
                     if title.year > 0 {
                         Text("•")
-                        Text("\(title.year)")
+                        Text(String(title.year))
                     }
                 }
                 .font(.caption)
@@ -634,22 +634,22 @@ enum ListSortOption: String, CaseIterable {
 
 enum ListGroupOption: String, CaseIterable {
     case none = "none"
-    case likedStatus = "likedStatus"
     case watchStatus = "watchStatus"
+    case provider = "provider"
 
     var label: String {
         switch self {
         case .none: return "None"
-        case .likedStatus: return "Liked Status"
         case .watchStatus: return "Watch Status"
+        case .provider: return "Provider"
         }
     }
 
     var icon: String {
         switch self {
         case .none: return "rectangle.grid.1x2"
-        case .likedStatus: return "hand.thumbsup"
         case .watchStatus: return "eye"
+        case .provider: return "play.tv"
         }
     }
 }
@@ -670,7 +670,6 @@ struct ListDetailView: View {
     @State private var sortOption: ListSortOption = .added
     @State private var sortAscending = false
     @State private var groupOption: ListGroupOption = .none
-    @State private var selectedLikedFilters: Set<Int> = []
     @State private var selectedWatchFilters: Set<Int16> = []
     @State private var showFilterSheet = false
     @State private var showSortMenu = false
@@ -690,9 +689,6 @@ struct ListDetailView: View {
         var titles = list.sortedTitles
 
         // Apply filters
-        if !selectedLikedFilters.isEmpty {
-            titles = titles.filter { selectedLikedFilters.contains(Int($0.likedStatus)) }
-        }
         if !selectedWatchFilters.isEmpty {
             titles = titles.filter { selectedWatchFilters.contains($0.watchStatus) }
         }
@@ -725,17 +721,6 @@ struct ListDetailView: View {
         switch groupOption {
         case .none:
             return [("", titles)]
-        case .likedStatus:
-            let grouped = Dictionary(grouping: titles) { title in
-                LikedStatus(rawValue: Int(title.likedStatus))?.displayName ?? "Unknown"
-            }
-            // Sort groups: Liked, Neutral, Disliked
-            let order = ["Liked", "Neutral", "Disliked"]
-            return grouped.sorted { first, second in
-                let firstIndex = order.firstIndex(of: first.key) ?? 99
-                let secondIndex = order.firstIndex(of: second.key) ?? 99
-                return firstIndex < secondIndex
-            }.map { (key: $0.key, titles: $0.value) }
         case .watchStatus:
             let grouped = Dictionary(grouping: titles) { title in
                 WatchStatus(rawValue: title.watchStatus)?.label ?? "Unknown"
@@ -747,12 +732,17 @@ struct ListDetailView: View {
                 let secondIndex = order.firstIndex(of: second.key) ?? 99
                 return firstIndex < secondIndex
             }.map { (key: $0.key, titles: $0.value) }
+        case .provider:
+            let grouped = Dictionary(grouping: titles) { title in
+                title.streamingService ?? "None"
+            }
+            return grouped.sorted { $0.key < $1.key }.map { (key: $0.key, titles: $0.value) }
         }
     }
 
     // Active filter count
     private var activeFilterCount: Int {
-        selectedLikedFilters.count + selectedWatchFilters.count
+        selectedWatchFilters.count
     }
 
     var body: some View {
@@ -953,7 +943,6 @@ struct ListDetailView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             FilterSheetView(
-                selectedLikedFilters: $selectedLikedFilters,
                 selectedWatchFilters: $selectedWatchFilters
             )
         }
@@ -1017,19 +1006,11 @@ struct ListDetailView: View {
 
 struct FilterSheetView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var selectedLikedFilters: Set<Int>
     @Binding var selectedWatchFilters: Set<Int16>
 
     var body: some View {
         NavigationStack {
             List {
-                // Liked Status Filters
-                Section("Liked Status") {
-                    LikedFilterRow(status: .liked, label: "Yes", color: .green, selectedFilters: $selectedLikedFilters)
-                    LikedFilterRow(status: .neutral, label: "Maybe", color: .secondary, selectedFilters: $selectedLikedFilters)
-                    LikedFilterRow(status: .disliked, label: "No", color: .red, selectedFilters: $selectedLikedFilters)
-                }
-
                 // Watch Status Filters
                 Section("Watch Status") {
                     ForEach(WatchStatus.allCases, id: \.rawValue) { status in
@@ -1042,10 +1023,9 @@ struct FilterSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Clear All") {
-                        selectedLikedFilters.removeAll()
                         selectedWatchFilters.removeAll()
                     }
-                    .disabled(selectedLikedFilters.isEmpty && selectedWatchFilters.isEmpty)
+                    .disabled(selectedWatchFilters.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
@@ -1055,35 +1035,6 @@ struct FilterSheetView: View {
             }
         }
         .presentationDetents([.medium, .large])
-    }
-}
-
-struct LikedFilterRow: View {
-    let status: LikedStatus
-    let label: String
-    let color: Color
-    @Binding var selectedFilters: Set<Int>
-
-    var body: some View {
-        Button {
-            if selectedFilters.contains(status.rawValue) {
-                selectedFilters.remove(status.rawValue)
-            } else {
-                selectedFilters.insert(status.rawValue)
-            }
-        } label: {
-            HStack {
-                Image(systemName: status.systemImage)
-                    .foregroundStyle(color)
-                Text(label)
-                    .foregroundStyle(.primary)
-                Spacer()
-                if selectedFilters.contains(status.rawValue) {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
-        }
     }
 }
 
@@ -1196,7 +1147,7 @@ struct TitleListRow: View {
                     Text(title.mediaType == "movie" ? "Movie" : "TV Show")
                     if title.year > 0 {
                         Text("•")
-                        Text("\(title.year)")
+                        Text(String(title.year))
                     }
                     // Show next unwatched episode for TV shows
                     if title.mediaType == "tv" {
@@ -1406,7 +1357,7 @@ struct TitleDetailView: View {
                         .lineLimit(3)
 
                     if title.year > 0 {
-                        Text("\(title.year)")
+                        Text(String(title.year))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -2189,7 +2140,7 @@ struct TitleDetailView: View {
     private var listsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("In Lists")
+                Text("Lists")
                     .font(.headline)
                 Spacer()
                 Button("Manage") {
