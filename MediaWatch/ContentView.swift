@@ -1446,18 +1446,67 @@ struct TitleDetailView: View {
                 }
             }
 
-            // Star Rating
-            VStack(alignment: .leading, spacing: 8) {
-                Text("My Rating")
+            // Ratings Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ratings")
                     .font(.headline)
 
-                StarRatingView(rating: Binding(
-                    get: { title.userRating },
-                    set: { newValue in
-                        title.userRating = newValue
-                        try? viewContext.save()
+                // Laura Rating
+                HStack {
+                    Text("Laura")
+                        .frame(width: 50, alignment: .leading)
+                    StarRatingView(rating: Binding(
+                        get: { title.lauraRating },
+                        set: { newValue in
+                            title.lauraRating = newValue
+                            try? viewContext.save()
+                        }
+                    ))
+                    Spacer()
+                    if title.lauraRating > 0 {
+                        Text(String(format: "%.1f", title.lauraRating))
+                            .font(.title2)
+                            .fontWeight(.bold)
                     }
-                ))
+                }
+
+                // Mike Rating
+                HStack {
+                    Text("Mike")
+                        .frame(width: 50, alignment: .leading)
+                    StarRatingView(rating: Binding(
+                        get: { title.mikeRating },
+                        set: { newValue in
+                            title.mikeRating = newValue
+                            try? viewContext.save()
+                        }
+                    ))
+                    Spacer()
+                    if title.mikeRating > 0 {
+                        Text(String(format: "%.1f", title.mikeRating))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                }
+
+                // Average Rating
+                if title.lauraRating > 0 || title.mikeRating > 0 {
+                    HStack {
+                        Text("Avg")
+                            .frame(width: 50, alignment: .leading)
+                        let avgRating = (title.lauraRating > 0 && title.mikeRating > 0)
+                            ? (title.lauraRating + title.mikeRating) / 2.0
+                            : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
+                                .foregroundStyle(.yellow)
+                        }
+                        Spacer()
+                        Text(String(format: "%.1f", avgRating))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                }
             }
         }
     }
