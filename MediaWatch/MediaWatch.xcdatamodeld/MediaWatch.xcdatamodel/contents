@@ -74,7 +74,6 @@
         <attribute name="title" attributeType="String" defaultValueString=""/>
         <attribute name="tmdbId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="userRating" optional="YES" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="castData" optional="YES" attributeType="Binary"/>
         <attribute name="voteAverage" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="voteCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="watched" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>

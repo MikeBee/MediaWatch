@@ -2189,8 +2189,31 @@ struct ListManagerSheet: View {
 
 // MARK: - Search View
 
+enum SearchMode: String, CaseIterable {
+    case tmdb = "TMDb"
+    case library = "My Library"
+}
+
+enum MediaTypeFilter: String, CaseIterable {
+    case all = "All"
+    case movie = "Movies"
+    case tv = "TV Shows"
+}
+
+enum LikedStatusFilter: String, CaseIterable {
+    case all = "All"
+    case liked = "Yes"
+    case disliked = "No"
+    case maybe = "Maybe"
+}
+
 struct SearchView: View {
     @Environment(\.managedObjectContext) private var viewContext
+
+    @FetchRequest(
+        entity: Title.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateAdded, ascending: false)]
+    ) private var allTitles: FetchedResults<Title>
 
     @State private var searchText = ""
     @State private var searchResults: [TMDbSearchResult] = []
@@ -2198,94 +2221,169 @@ struct SearchView: View {
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var selectedResult: TMDbSearchResult?
+    @State private var selectedTitle: Title?
+
+    // Library search filters
+    @State private var searchMode: SearchMode = .tmdb
+    @State private var mediaTypeFilter: MediaTypeFilter = .all
+    @State private var likedStatusFilter: LikedStatusFilter = .all
+
+    // Filtered library results
+    private var filteredLibraryResults: [Title] {
+        var results = Array(allTitles)
+
+        // Apply media type filter
+        if mediaTypeFilter != .all {
+            let filterValue = mediaTypeFilter == .movie ? "movie" : "tv"
+            results = results.filter { $0.mediaType == filterValue }
+        }
+
+        // Apply liked status filter
+        if likedStatusFilter != .all {
+            let statusValue: Int16
+            switch likedStatusFilter {
+            case .liked: statusValue = 1
+            case .disliked: statusValue = 2
+            case .maybe: statusValue = 3
+            case .all: statusValue = 0
+            }
+            results = results.filter { $0.likedStatus == statusValue }
+        }
+
+        // Apply search text
+        if !searchText.isEmpty {
+            let searchLower = searchText.lowercased()
+            results = results.filter { title in
+                // Search in title
+                if title.title?.lowercased().contains(searchLower) == true {
+                    return true
+                }
+                // Search in overview
+                if title.overview?.lowercased().contains(searchLower) == true {
+                    return true
+                }
+                // Search in genres
+                if let genres = title.genres as? [String] {
+                    if genres.contains(where: { $0.lowercased().contains(searchLower) }) {
+                        return true
+                    }
+                }
+                // Search in cast names
+                if title.castNames.contains(where: { $0.lowercased().contains(searchLower) }) {
+                    return true
+                }
+                return false
+            }
+        }
+
+        return results
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    if searchText.isEmpty {
-                        // Trending Section
-                        if !trendingResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Trending This Week")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .padding(.horizontal)
+            VStack(spacing: 0) {
+                // Search mode picker
+                Picker("Search Mode", selection: $searchMode) {
+                    ForEach(SearchMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    LazyHStack(spacing: 16) {
-                                        ForEach(trendingResults) { result in
-                                            Button {
-                                                selectedResult = result
-                                            } label: {
-                                                TrendingCard(result: result)
+                // Library filters (only show in library mode)
+                if searchMode == .library {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Menu {
+                                ForEach(MediaTypeFilter.allCases, id: \.self) { filter in
+                                    Button {
+                                        mediaTypeFilter = filter
+                                    } label: {
+                                        HStack {
+                                            Text(filter.rawValue)
+                                            if mediaTypeFilter == filter {
+                                                Image(systemName: "checkmark")
                                             }
-                                            .buttonStyle(.plain)
                                         }
                                     }
-                                    .padding(.horizontal)
                                 }
-                            }
-                        }
-
-                        // Empty state when no trending
-                        if trendingResults.isEmpty && !isSearching {
-                            VStack(spacing: 16) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 50))
-                                    .foregroundStyle(.secondary)
-
-                                Text("Search for Movies & TV Shows")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-
-                                Text("Find titles to add to your lists")
-                                    .font(.body)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)
-                        }
-                    } else if isSearching {
-                        ProgressView("Searching...")
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)
-                    } else if let error = errorMessage {
-                        ContentUnavailableView {
-                            Label("Error", systemImage: "exclamationmark.triangle")
-                        } description: {
-                            Text(error)
-                        }
-                    } else if searchResults.isEmpty {
-                        ContentUnavailableView {
-                            Label("No Results", systemImage: "magnifyingglass")
-                        } description: {
-                            Text("No movies or TV shows found for \"\(searchText)\"")
-                        }
-                    } else {
-                        // Search Results
-                        LazyVStack(spacing: 12) {
-                            ForEach(searchResults) { result in
-                                Button {
-                                    selectedResult = result
-                                } label: {
-                                    SearchResultRow(result: result)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "film")
+                                    Text(mediaTypeFilter.rawValue)
+                                    Image(systemName: "chevron.down")
                                 }
-                                .buttonStyle(.plain)
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
                             }
+
+                            Menu {
+                                ForEach(LikedStatusFilter.allCases, id: \.self) { filter in
+                                    Button {
+                                        likedStatusFilter = filter
+                                    } label: {
+                                        HStack {
+                                            Text(filter.rawValue)
+                                            if likedStatusFilter == filter {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "hand.thumbsup")
+                                    Text(likedStatusFilter.rawValue)
+                                    Image(systemName: "chevron.down")
+                                }
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                            }
+
+                            Spacer()
                         }
                         .padding(.horizontal)
                     }
+                    .padding(.bottom, 8)
                 }
-                .padding(.top)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if searchMode == .tmdb {
+                            // TMDb Search Mode
+                            tmdbSearchContent
+                        } else {
+                            // Library Search Mode
+                            librarySearchContent
+                        }
+                    }
+                    .padding(.top)
+                }
             }
             .navigationTitle("Search")
-            .searchable(text: $searchText, prompt: "Movies, TV Shows...")
+            .searchable(text: $searchText, prompt: searchMode == .tmdb ? "Movies, TV Shows..." : "Title, actor, genre...")
             .onSubmit(of: .search) {
-                performSearch()
+                if searchMode == .tmdb {
+                    performSearch()
+                }
             }
             .onChange(of: searchText) { oldValue, newValue in
-                if newValue.isEmpty {
+                if newValue.isEmpty && searchMode == .tmdb {
+                    searchResults = []
+                    errorMessage = nil
+                }
+            }
+            .onChange(of: searchMode) { oldValue, newValue in
+                // Clear TMDb results when switching to library
+                if newValue == .library {
                     searchResults = []
                     errorMessage = nil
                 }
@@ -2294,9 +2392,122 @@ struct SearchView: View {
                 SearchResultDetailView(result: result)
                     .environment(\.managedObjectContext, viewContext)
             }
+            .sheet(item: $selectedTitle) { title in
+                TitleDetailView(title: title)
+                    .environment(\.managedObjectContext, viewContext)
+            }
             .task {
                 await loadTrending()
             }
+        }
+    }
+
+    // MARK: - TMDb Search Content
+
+    @ViewBuilder
+    private var tmdbSearchContent: some View {
+        if searchText.isEmpty {
+            // Trending Section
+            if !trendingResults.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Trending This Week")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 16) {
+                            ForEach(trendingResults) { result in
+                                Button {
+                                    selectedResult = result
+                                } label: {
+                                    TrendingCard(result: result)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+            }
+
+            // Empty state when no trending
+            if trendingResults.isEmpty && !isSearching {
+                VStack(spacing: 16) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 50))
+                        .foregroundStyle(.secondary)
+
+                    Text("Search for Movies & TV Shows")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+
+                    Text("Find titles to add to your lists")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+            }
+        } else if isSearching {
+            ProgressView("Searching...")
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+        } else if let error = errorMessage {
+            ContentUnavailableView {
+                Label("Error", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(error)
+            }
+        } else if searchResults.isEmpty {
+            ContentUnavailableView {
+                Label("No Results", systemImage: "magnifyingglass")
+            } description: {
+                Text("No movies or TV shows found for \"\(searchText)\"")
+            }
+        } else {
+            // Search Results
+            LazyVStack(spacing: 12) {
+                ForEach(searchResults) { result in
+                    Button {
+                        selectedResult = result
+                    } label: {
+                        SearchResultRow(result: result)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    // MARK: - Library Search Content
+
+    @ViewBuilder
+    private var librarySearchContent: some View {
+        if filteredLibraryResults.isEmpty {
+            ContentUnavailableView {
+                Label(searchText.isEmpty ? "No Titles" : "No Results", systemImage: searchText.isEmpty ? "tray" : "magnifyingglass")
+            } description: {
+                if searchText.isEmpty {
+                    Text("Add movies and TV shows to see them here")
+                } else {
+                    Text("No titles found matching \"\(searchText)\"")
+                }
+            }
+            .padding(.top, 40)
+        } else {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredLibraryResults) { title in
+                    Button {
+                        selectedTitle = title
+                    } label: {
+                        LibrarySearchRow(title: title)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
         }
     }
 
@@ -2335,6 +2546,81 @@ struct SearchView: View {
         } catch {
             // Silently fail for trending
         }
+    }
+}
+
+// MARK: - Library Search Row
+
+struct LibrarySearchRow: View {
+    @ObservedObject var title: Title
+
+    var body: some View {
+        HStack(spacing: 12) {
+            PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
+                .frame(width: 60, height: 90)
+                .cornerRadius(6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title.title ?? "Unknown")
+                    .font(.headline)
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: 6) {
+                    Text(title.mediaType == "movie" ? "Movie" : "TV")
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(4)
+
+                    if title.year > 0 {
+                        Text(String(title.year))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Liked status indicator
+                    if title.likedStatus == 1 {
+                        Image(systemName: "hand.thumbsup.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else if title.likedStatus == 2 {
+                        Image(systemName: "hand.thumbsdown.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else if title.likedStatus == 3 {
+                        Image(systemName: "hand.raised.fill")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
+                }
+
+                // Show genres if available
+                if let genres = title.genres as? [String], !genres.isEmpty {
+                    Text(genres.prefix(3).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                // Show cast if available
+                if !title.castNames.isEmpty {
+                    Text(title.castNames.prefix(2).joined(separator: ", "))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
     }
 }
 
