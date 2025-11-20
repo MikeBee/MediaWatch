@@ -612,6 +612,7 @@ struct ListsView: View {
     @State private var isAscending = true
     @State private var filterMode: ListFilterMode = .all
     @State private var viewMode: ListViewMode = .grid
+    @State private var editMode: EditMode = .inactive
 
     private var filteredAndSortedLists: [MediaList] {
         var results = Array(allLists)
@@ -678,7 +679,7 @@ struct ListsView: View {
                             NavigationLink {
                                 ListDetailView(list: list)
                             } label: {
-                                ListRowCard(list: list, showDragHandle: true)
+                                ListRowCard(list: list, showDragHandle: editMode.isEditing)
                             }
                         }
                         .onMove { source, destination in
@@ -686,7 +687,7 @@ struct ListsView: View {
                         }
                     }
                     .listStyle(.plain)
-                    .environment(\.editMode, .constant(.active))
+                    .environment(\.editMode, $editMode)
                 } else {
                     // Use ScrollView for all other modes
                     ScrollView {
@@ -742,7 +743,24 @@ struct ListsView: View {
                 }
             }
             .navigationTitle("Lists")
+            .onChange(of: sortMode) { _ in
+                editMode = .inactive
+            }
+            .onChange(of: viewMode) { _ in
+                editMode = .inactive
+            }
             .toolbar {
+                // Edit button for manual reordering (left side)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if viewMode == .list && sortMode == .manual {
+                        Button(editMode.isEditing ? "Done" : "Edit") {
+                            withAnimation {
+                                editMode = editMode.isEditing ? .inactive : .active
+                            }
+                        }
+                    }
+                }
+
                 ToolbarItemGroup(placement: .primaryAction) {
                     // Sort menu
                     Menu {
