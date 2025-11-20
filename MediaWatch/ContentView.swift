@@ -760,7 +760,6 @@ struct ListDetailView: View {
                     Text("No titles match your current filters")
                 } actions: {
                     Button("Clear Filters") {
-                        selectedLikedFilters.removeAll()
                         selectedWatchFilters.removeAll()
                     }
                 }
