@@ -1751,7 +1751,7 @@ struct TitleDetailView: View {
                 // Vote Average
                 if title.voteAverage > 0 {
                     HStack {
-                        Text("TMDb Rating")
+                        Text("TMDB Rating")
                             .foregroundStyle(.secondary)
                         Spacer()
                         HStack(spacing: 4) {
@@ -2881,7 +2881,7 @@ struct ListManagerSheet: View {
 // MARK: - Search View
 
 enum SearchMode: String, CaseIterable {
-    case tmdb = "TMDb"
+    case tmdb = "TMDB"
     case library = "My Library"
 }
 
@@ -2909,7 +2909,11 @@ struct SearchView: View {
 
     @State private var searchText = ""
     @State private var searchResults: [TMDbSearchResult] = []
-    @State private var trendingResults: [TMDbSearchResult] = []
+    @State private var popularMovies: [TMDbSearchResult] = []
+    @State private var popularTV: [TMDbSearchResult] = []
+    @State private var trendingToday: [TMDbSearchResult] = []
+    @State private var trendingMoviesWeek: [TMDbSearchResult] = []
+    @State private var trendingTVWeek: [TMDbSearchResult] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var selectedResult: TMDbSearchResult?
@@ -3082,7 +3086,7 @@ struct SearchView: View {
                     .environment(\.managedObjectContext, viewContext)
             }
             .task {
-                await loadTrending()
+                await loadAllSections()
             }
         }
     }
@@ -3092,47 +3096,50 @@ struct SearchView: View {
     @ViewBuilder
     private var tmdbSearchContent: some View {
         if searchText.isEmpty {
-            // Trending Section
-            if !trendingResults.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Trending This Week")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
+            VStack(spacing: 24) {
+                // Popular Movies
+                if !popularMovies.isEmpty {
+                    MediaSection(title: "Popular Movies", results: popularMovies, selectedResult: $selectedResult)
+                }
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 16) {
-                            ForEach(trendingResults) { result in
-                                Button {
-                                    selectedResult = result
-                                } label: {
-                                    TrendingCard(result: result)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal)
+                // Popular TV Shows
+                if !popularTV.isEmpty {
+                    MediaSection(title: "Popular TV Shows", results: popularTV, selectedResult: $selectedResult)
+                }
+
+                // Trending Today
+                if !trendingToday.isEmpty {
+                    MediaSection(title: "Trending Today", results: trendingToday, selectedResult: $selectedResult)
+                }
+
+                // Trending Movies This Week
+                if !trendingMoviesWeek.isEmpty {
+                    MediaSection(title: "Trending Movies This Week", results: trendingMoviesWeek, selectedResult: $selectedResult)
+                }
+
+                // Trending TV This Week
+                if !trendingTVWeek.isEmpty {
+                    MediaSection(title: "Trending TV This Week", results: trendingTVWeek, selectedResult: $selectedResult)
+                }
+
+                // Empty state when no sections loaded
+                if popularMovies.isEmpty && popularTV.isEmpty && trendingToday.isEmpty && trendingMoviesWeek.isEmpty && trendingTVWeek.isEmpty && !isSearching {
+                    VStack(spacing: 16) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.secondary)
+
+                        Text("Search for Movies & TV Shows")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+
+                        Text("Find titles to add to your lists")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
                 }
-            }
-
-            // Empty state when no trending
-            if trendingResults.isEmpty && !isSearching {
-                VStack(spacing: 16) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.secondary)
-
-                    Text("Search for Movies & TV Shows")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-
-                    Text("Find titles to add to your lists")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 60)
             }
         } else if isSearching {
             ProgressView("Searching...")
@@ -3220,16 +3227,74 @@ struct SearchView: View {
         }
     }
 
-    private func loadTrending() async {
+    private func loadAllSections() async {
+        async let popularMoviesData = loadPopularMovies()
+        async let popularTVData = loadPopularTV()
+        async let trendingTodayData = loadTrendingToday()
+        async let trendingMoviesData = loadTrendingMoviesWeek()
+        async let trendingTVData = loadTrendingTVWeek()
+
+        await popularMoviesData
+        await popularTVData
+        await trendingTodayData
+        await trendingMoviesData
+        await trendingTVData
+    }
+
+    private func loadPopularMovies() async {
         do {
-            let response = try await TMDbService.shared.getTrending()
+            let response = try await TMDbService.shared.getPopularMovies()
             await MainActor.run {
-                trendingResults = response.results.filter {
+                popularMovies = response.results.filter { $0.resolvedMediaType == "movie" }
+            }
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private func loadPopularTV() async {
+        do {
+            let response = try await TMDbService.shared.getPopularTV()
+            await MainActor.run {
+                popularTV = response.results.filter { $0.resolvedMediaType == "tv" }
+            }
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private func loadTrendingToday() async {
+        do {
+            let response = try await TMDbService.shared.getTrending(mediaType: "all", timeWindow: "day")
+            await MainActor.run {
+                trendingToday = response.results.filter {
                     $0.resolvedMediaType == "movie" || $0.resolvedMediaType == "tv"
                 }
             }
         } catch {
-            // Silently fail for trending
+            // Silently fail
+        }
+    }
+
+    private func loadTrendingMoviesWeek() async {
+        do {
+            let response = try await TMDbService.shared.getTrending(mediaType: "movie", timeWindow: "week")
+            await MainActor.run {
+                trendingMoviesWeek = response.results.filter { $0.resolvedMediaType == "movie" }
+            }
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private func loadTrendingTVWeek() async {
+        do {
+            let response = try await TMDbService.shared.getTrending(mediaType: "tv", timeWindow: "week")
+            await MainActor.run {
+                trendingTVWeek = response.results.filter { $0.resolvedMediaType == "tv" }
+            }
+        } catch {
+            // Silently fail
         }
     }
 }
@@ -3291,6 +3356,37 @@ struct LibrarySearchRow: View {
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Media Section
+
+struct MediaSection: View {
+    let title: String
+    let results: [TMDbSearchResult]
+    @Binding var selectedResult: TMDbSearchResult?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 16) {
+                    ForEach(results) { result in
+                        Button {
+                            selectedResult = result
+                        } label: {
+                            TrendingCard(result: result)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
     }
 }
 
@@ -3768,7 +3864,7 @@ struct UserManualView: View {
             // Searching & Adding
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("TMDb Search")
+                    Text("TMDB Search")
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
@@ -4126,7 +4222,7 @@ struct ProfileView: View {
 
                     Link(destination: URL(string: "https://www.themoviedb.org")!) {
                         HStack {
-                            Label("Powered by TMDb", systemImage: "film")
+                            Label("Powered by TMDB", systemImage: "film")
                             Spacer()
                             Image(systemName: "arrow.up.right")
                                 .foregroundStyle(.secondary)
@@ -4585,37 +4681,168 @@ struct HistoryListView: View {
 
     var body: some View {
         let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
-        let recentTitles = allTitles.filter { title in
-            if let date = title.dateAdded {
-                return date >= oneYearAgo
-            }
-            return false
-        }
-        .sorted { ($0.dateAdded ?? Date.distantPast) > ($1.dateAdded ?? Date.distantPast) }
 
-        ForEach(recentTitles) { title in
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                    Text("Added: \(title.title ?? "Unknown")")
-                        .font(.subheadline)
-                    Spacer()
-                    if let date = title.dateAdded {
-                        Text(date.formatted(date: .abbreviated, time: .omitted))
+        // Collect all activity events
+        var activities: [ActivityEvent] = []
+
+        for title in allTitles {
+            // Title added
+            if let date = title.dateAdded, date >= oneYearAgo {
+                activities.append(ActivityEvent(
+                    date: date,
+                    type: .added,
+                    title: title.title ?? "Unknown",
+                    icon: "plus.circle.fill",
+                    color: .green
+                ))
+            }
+
+            // Title modified (ratings, status changes, etc.)
+            if let date = title.dateModified, date >= oneYearAgo, date != title.dateAdded {
+                // Check what was modified
+                if title.mikeRating > 0 || title.lauraRating > 0 || title.userRating > 0 {
+                    let ratingText = [
+                        title.mikeRating > 0 ? "Mike: \(String(format: "%.1f", title.mikeRating))" : nil,
+                        title.lauraRating > 0 ? "Laura: \(String(format: "%.1f", title.lauraRating))" : nil,
+                        title.userRating > 0 ? "User: \(String(format: "%.1f", title.userRating))" : nil
+                    ].compactMap { $0 }.joined(separator: ", ")
+
+                    if !ratingText.isEmpty {
+                        activities.append(ActivityEvent(
+                            date: date,
+                            type: .rated,
+                            title: title.title ?? "Unknown",
+                            detail: ratingText,
+                            icon: "star.fill",
+                            color: .yellow
+                        ))
+                    }
+                }
+
+                // Status change
+                if let status = WatchStatus(rawValue: title.watchStatus) {
+                    activities.append(ActivityEvent(
+                        date: date,
+                        type: .statusChanged,
+                        title: title.title ?? "Unknown",
+                        detail: "Status: \(status.label)",
+                        icon: status.icon,
+                        color: status.color
+                    ))
+                }
+
+                // Favorite toggled
+                if title.isFavorite {
+                    activities.append(ActivityEvent(
+                        date: date,
+                        type: .favorited,
+                        title: title.title ?? "Unknown",
+                        icon: "heart.fill",
+                        color: .red
+                    ))
+                }
+            }
+
+            // Episodes watched
+            if let date = title.lastWatched, date >= oneYearAgo {
+                let episodes = (title.episodes as? Set<Episode>) ?? []
+                let watchedCount = episodes.filter { $0.watched }.count
+                if watchedCount > 0 {
+                    activities.append(ActivityEvent(
+                        date: date,
+                        type: .watched,
+                        title: title.title ?? "Unknown",
+                        detail: "\(watchedCount) episode\(watchedCount == 1 ? "" : "s")",
+                        icon: "play.circle.fill",
+                        color: .blue
+                    ))
+                }
+            }
+
+            // Movie watched
+            if title.mediaType == "movie", title.watched, let date = title.watchedDate, date >= oneYearAgo {
+                activities.append(ActivityEvent(
+                    date: date,
+                    type: .watched,
+                    title: title.title ?? "Unknown",
+                    icon: "checkmark.circle.fill",
+                    color: .green
+                ))
+            }
+        }
+
+        // Sort by date (most recent first)
+        let sortedActivities = activities.sorted { $0.date > $1.date }
+
+        if sortedActivities.isEmpty {
+            Text("No activity in the last year")
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+        } else {
+            ForEach(sortedActivities) { activity in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: activity.icon)
+                            .font(.caption)
+                            .foregroundStyle(activity.color)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(activity.type.displayName): \(activity.title)")
+                                .font(.subheadline)
+                            if let detail = activity.detail {
+                                Text(detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Text(activity.date.formatted(date: .abbreviated, time: .omitted))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
         }
+    }
+}
 
-        if recentTitles.isEmpty {
-            Text("No activity in the last year")
-                .foregroundStyle(.secondary)
-                .font(.subheadline)
+// MARK: - Activity Event Model
+
+struct ActivityEvent: Identifiable {
+    let id = UUID()
+    let date: Date
+    let type: ActivityType
+    let title: String
+    let detail: String?
+    let icon: String
+    let color: Color
+
+    init(date: Date, type: ActivityType, title: String, detail: String? = nil, icon: String, color: Color) {
+        self.date = date
+        self.type = type
+        self.title = title
+        self.detail = detail
+        self.icon = icon
+        self.color = color
+    }
+}
+
+enum ActivityType {
+    case added
+    case rated
+    case statusChanged
+    case favorited
+    case watched
+    case removed
+
+    var displayName: String {
+        switch self {
+        case .added: return "Added"
+        case .rated: return "Rated"
+        case .statusChanged: return "Status Changed"
+        case .favorited: return "Favorited"
+        case .watched: return "Watched"
+        case .removed: return "Removed"
         }
     }
 }
