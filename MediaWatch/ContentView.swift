@@ -5162,17 +5162,9 @@ struct HistoryListView: View {
                     }
                 }
 
-                // Status change
-                if let status = WatchStatus(rawValue: title.watchStatus) {
-                    events.append(ActivityEvent(
-                        date: date,
-                        type: .statusChanged,
-                        title: title.title ?? "Unknown",
-                        detail: "Status: \(status.label)",
-                        icon: status.icon,
-                        color: status.color
-                    ))
-                }
+                // Note: Status change tracking removed because dateModified is updated
+                // for various reasons (ratings, episodes watched/starred, etc.) and we
+                // cannot reliably determine when the actual watch status changed
 
                 // Favorite toggled
                 if title.isFavorite {
