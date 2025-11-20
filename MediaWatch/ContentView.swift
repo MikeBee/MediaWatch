@@ -1651,19 +1651,19 @@ struct TitleDetailView: View {
                 }
 
                 // Average Rating
-                if title.lauraRating > 0 || title.mikeRating > 0 {
-                    HStack {
-                        Text("Avg")
-                            .frame(width: 50, alignment: .leading)
-                        let avgRating = (title.lauraRating > 0 && title.mikeRating > 0)
-                            ? (title.lauraRating + title.mikeRating) / 2.0
-                            : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
-                        ForEach(1...5, id: \.self) { star in
-                            Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
-                                .font(.title2)
-                                .foregroundStyle(.yellow)
-                        }
-                        Spacer()
+                HStack {
+                    Text("Avg")
+                        .frame(width: 50, alignment: .leading)
+                    let avgRating = (title.lauraRating > 0 && title.mikeRating > 0)
+                        ? (title.lauraRating + title.mikeRating) / 2.0
+                        : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
+                    ForEach(1...5, id: \.self) { star in
+                        Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
+                            .font(.title2)
+                            .foregroundStyle(.yellow)
+                    }
+                    Spacer()
+                    if avgRating > 0 {
                         Text(String(format: "%.1f", avgRating))
                             .font(.title2)
                             .fontWeight(.bold)
@@ -3695,6 +3695,295 @@ struct AddToListSheet: View {
 
 // MARK: - Profile View
 
+// MARK: - User Manual View
+
+struct UserManualView: View {
+    var body: some View {
+        List {
+            // Getting Started
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("MediaWatch helps you track movies and TV shows you're watching. Search for titles, organize them in lists, track your progress, and rate what you've watched.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Getting Started", systemImage: "star")
+            }
+
+            // Home Screen
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("The Home screen shows your titles organized by watch status:")
+                        .font(.subheadline)
+
+                    BulletPoint(text: "Current - What you're actively watching")
+                    BulletPoint(text: "New - Titles you plan to start")
+                    BulletPoint(text: "Paused - Temporarily on hold")
+                    BulletPoint(text: "Maybe - Considering watching")
+                    BulletPoint(text: "Finished - Completed titles")
+
+                    Text("View Modes")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Tap the view mode icon in the toolbar to switch between:")
+                        .font(.subheadline)
+
+                    BulletPoint(text: "Carousel - Horizontal scrolling cards")
+                    BulletPoint(text: "Grid - Vertical poster grid")
+                    BulletPoint(text: "List - Detailed list view")
+                }
+            } header: {
+                Label("Home Screen", systemImage: "house")
+            }
+
+            // Searching & Adding
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("TMDb Search")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text("Search for movies and TV shows from The Movie Database. Tap a result to view details and add it to your library.")
+                        .font(.subheadline)
+
+                    Text("Library Search")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Search your existing library by title, actor, or genre. Filter by media type (Movie/TV) and category.")
+                        .font(.subheadline)
+
+                    Text("Adding Titles")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("From search results, tap a title then tap 'Add to Library'. Choose which lists to add it to.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Searching & Adding", systemImage: "magnifyingglass")
+            }
+
+            // Lists
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Create custom lists to organize your titles (e.g., 'Watch with Laura', 'Action Movies').")
+                        .font(.subheadline)
+
+                    Text("Creating Lists")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Tap the + button in the Lists tab to create a new list. Choose a name, icon, and color.")
+                        .font(.subheadline)
+
+                    Text("Sorting & Filtering")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    BulletPoint(text: "Sort by: Added, Updated, Alpha, Started, Last Watched, Rating")
+                    BulletPoint(text: "Group by: Watch Status, Provider")
+                    BulletPoint(text: "Filter by: Watch Status")
+
+                    Text("Managing Lists")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Long-press a list to rename or delete it. Use the toolbar icons to change sort, filter, and group options.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Lists", systemImage: "list.bullet")
+            }
+
+            // Title Details
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tap any title to view its details and manage your tracking.")
+                        .font(.subheadline)
+
+                    Text("Watch Status")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Set the status to track where you are with each title: Current, New, Paused, Maybe, or Finished.")
+                        .font(.subheadline)
+
+                    Text("Dates")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    BulletPoint(text: "Started - When you began watching (auto-set on first episode)")
+                    BulletPoint(text: "Last Watched - Most recent viewing (auto-updated)")
+                    BulletPoint(text: "Tap dates to edit or clear them")
+
+                    Text("Ratings")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    BulletPoint(text: "Laura Rating - Laura's personal rating")
+                    BulletPoint(text: "Mike Rating - Mike's personal rating")
+                    BulletPoint(text: "Avg Rating - Calculated average")
+                    BulletPoint(text: "Tap star for full, tap again for half, tap again to clear")
+
+                    Text("Favorite")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Tap the star icon in the header to mark a title as a favorite.")
+                        .font(.subheadline)
+
+                    Text("Category (TV Only)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Categorize TV titles as: Series, Limited Series, TV Show, or TV Movie.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Title Details", systemImage: "info.circle")
+            }
+
+            // Episode Tracking
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("For TV shows, track individual episodes you've watched.")
+                        .font(.subheadline)
+
+                    Text("Viewing Episodes")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    BulletPoint(text: "Tap 'Expand All' to show all seasons and episodes")
+                    BulletPoint(text: "Tap 'Collapse All' to hide all seasons")
+                    BulletPoint(text: "Tap a season header to expand/collapse it")
+
+                    Text("Marking Episodes")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    BulletPoint(text: "Tap the circle to mark an episode as watched")
+                    BulletPoint(text: "Tap the star to mark an episode as a favorite")
+                    BulletPoint(text: "Tap the season checkmark to mark all episodes in that season")
+
+                    Text("Next Episode Badge")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("The badge shows your next unwatched episode (e.g., 'S2 E5'). Updates automatically when you mark episodes.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Episode Tracking", systemImage: "tv")
+            }
+
+            // Streaming Services
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Track where each title is available to stream.")
+                        .font(.subheadline)
+
+                    Text("Tap 'Where to Watch' in the title details to select from available streaming services like Netflix, Disney+, Hulu, Apple TV+, and more.")
+                        .font(.subheadline)
+
+                    Text("Service badges appear on title cards throughout the app.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Streaming Services", systemImage: "play.tv")
+            }
+
+            // Notes
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Add personal notes to any title.")
+                        .font(.subheadline)
+
+                    Text("Tap 'Add Note' in the Notes section. Notes are private and sync across your devices via iCloud.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Notes", systemImage: "note.text")
+            }
+
+            // Data Management
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Export to JSON")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text("Create a backup of all your data including titles, lists, episodes, and notes. Save the JSON file to Files or share it.")
+                        .font(.subheadline)
+
+                    Text("Import from JSON")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Restore from a previously exported backup. Warning: This replaces all existing data.")
+                        .font(.subheadline)
+
+                    Text("iCloud Sync")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.top, 8)
+
+                    Text("Your data automatically syncs across all devices signed into the same iCloud account.")
+                        .font(.subheadline)
+                }
+            } header: {
+                Label("Data Management", systemImage: "externaldrive")
+            }
+
+            // Tips
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    BulletPoint(text: "Swipe left on a title in a list to remove it from that list")
+                    BulletPoint(text: "Use the share button to share a title with friends")
+                    BulletPoint(text: "Tap 'Refresh Episodes' to update episode data from TMDb")
+                    BulletPoint(text: "Clear image cache in Profile if the app uses too much storage")
+                }
+            } header: {
+                Label("Tips & Tricks", systemImage: "lightbulb")
+            }
+        }
+        .navigationTitle("User Manual")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+// Helper view for bullet points
+struct BulletPoint: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .font(.subheadline)
+            Text(text)
+                .font(.subheadline)
+        }
+    }
+}
+
+// MARK: - Profile View
+
 struct ProfileView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var appSettings = AppSettings.shared
@@ -3793,6 +4082,15 @@ struct ProfileView: View {
                         }
                     }
                     .disabled(isBackingUp || isRestoring)
+                }
+
+                // Help Section
+                Section("Help") {
+                    NavigationLink {
+                        UserManualView()
+                    } label: {
+                        Label("User Manual", systemImage: "book")
+                    }
                 }
 
                 // App Section
@@ -4177,13 +4475,6 @@ struct StarRatingView: View {
                             rating = starValue
                         }
                     }
-            }
-
-            if rating > 0 {
-                Text(String(format: "%.1f", rating))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
             }
         }
         .font(.title2)
