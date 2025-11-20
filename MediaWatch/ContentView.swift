@@ -656,6 +656,7 @@ enum ListGroupOption: String, CaseIterable {
 
 struct ListDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var persistenceController: PersistenceController
     @ObservedObject var list: MediaList
 
@@ -672,6 +673,13 @@ struct ListDetailView: View {
     @State private var selectedLikedFilters: Set<Int> = []
     @State private var selectedWatchFilters: Set<Int16> = []
     @State private var showFilterSheet = false
+    @State private var showSortMenu = false
+    @State private var showGroupMenu = false
+
+    // Rename and Delete
+    @State private var showRenameAlert = false
+    @State private var newListName = ""
+    @State private var showDeleteConfirmation = false
 
     enum ViewMode {
         case grid, list
@@ -829,77 +837,97 @@ struct ListDetailView: View {
         .navigationTitle(list.displayName)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                // Sort menu
                 Menu {
-                    // Sort options
-                    Section("Sort By") {
-                        Picker("Sort", selection: $sortOption) {
-                            ForEach(ListSortOption.allCases, id: \.self) { option in
-                                Label(option.label, systemImage: option.icon)
-                                    .tag(option)
-                            }
+                    Picker("Sort", selection: $sortOption) {
+                        ForEach(ListSortOption.allCases, id: \.self) { option in
+                            Label(option.label, systemImage: option.icon)
+                                .tag(option)
                         }
+                    }
 
-                        Button {
-                            sortAscending.toggle()
-                        } label: {
+                    Divider()
+
+                    Button {
+                        sortAscending.toggle()
+                    } label: {
+                        Label(
+                            sortAscending ? "Ascending" : "Descending",
+                            systemImage: sortAscending ? "arrow.up" : "arrow.down"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+
+                // Group menu
+                Menu {
+                    Picker("Group", selection: $groupOption) {
+                        ForEach(ListGroupOption.allCases, id: \.self) { option in
+                            Label(option.label, systemImage: option.icon)
+                                .tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: groupOption == .none ? "rectangle.3.group" : "rectangle.3.group.fill")
+                }
+
+                // Filter button
+                Button {
+                    showFilterSheet = true
+                } label: {
+                    Image(systemName: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
+
+                // More options menu
+                Menu {
+                    // View mode
+                    Button {
+                        viewMode = viewMode == .grid ? .list : .grid
+                    } label: {
+                        Label(
+                            viewMode == .grid ? "List View" : "Grid View",
+                            systemImage: viewMode == .grid ? "list.bullet" : "square.grid.2x2"
+                        )
+                    }
+
+                    Divider()
+
+                    // Rename
+                    Button {
+                        newListName = list.name ?? ""
+                        showRenameAlert = true
+                    } label: {
+                        Label("Rename List", systemImage: "pencil")
+                    }
+
+                    // Share
+                    Button {
+                        Task {
+                            await prepareShare()
+                        }
+                    } label: {
+                        if isPreparingShare {
+                            Label("Preparing...", systemImage: "hourglass")
+                        } else {
                             Label(
-                                sortAscending ? "Ascending" : "Descending",
-                                systemImage: sortAscending ? "arrow.up" : "arrow.down"
+                                persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
+                                systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
                             )
                         }
                     }
+                    .disabled(isPreparingShare)
 
-                    // Group options
-                    Section("Group By") {
-                        Picker("Group", selection: $groupOption) {
-                            ForEach(ListGroupOption.allCases, id: \.self) { option in
-                                Label(option.label, systemImage: option.icon)
-                                    .tag(option)
-                            }
-                        }
+                    Divider()
+
+                    // Delete
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete List", systemImage: "trash")
                     }
-
-                    Section {
-                        // Filter
-                        Button {
-                            showFilterSheet = true
-                        } label: {
-                            Label(
-                                activeFilterCount > 0 ? "Filter (\(activeFilterCount))" : "Filter",
-                                systemImage: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                            )
-                        }
-                    }
-
-                    Section {
-                        // View mode
-                        Button {
-                            viewMode = viewMode == .grid ? .list : .grid
-                        } label: {
-                            Label(
-                                viewMode == .grid ? "List View" : "Grid View",
-                                systemImage: viewMode == .grid ? "list.bullet" : "square.grid.2x2"
-                            )
-                        }
-
-                        // CloudKit Sharing
-                        Button {
-                            Task {
-                                await prepareShare()
-                            }
-                        } label: {
-                            if isPreparingShare {
-                                Label("Preparing...", systemImage: "hourglass")
-                            } else {
-                                Label(
-                                    persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
-                                    systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
-                                )
-                            }
-                        }
-                        .disabled(isPreparingShare)
-                    }
+                    .disabled(list.isDefault)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -928,6 +956,29 @@ struct ListDetailView: View {
                 selectedLikedFilters: $selectedLikedFilters,
                 selectedWatchFilters: $selectedWatchFilters
             )
+        }
+        .alert("Rename List", isPresented: $showRenameAlert) {
+            TextField("List name", text: $newListName)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                if !newListName.isEmpty {
+                    list.name = newListName
+                    list.dateModified = Date()
+                    try? viewContext.save()
+                }
+            }
+        } message: {
+            Text("Enter a new name for this list")
+        }
+        .alert("Delete List", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                viewContext.delete(list)
+                try? viewContext.save()
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(list.name ?? "this list")\"? This action cannot be undone.")
         }
     }
 
