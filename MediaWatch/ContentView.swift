@@ -1533,7 +1533,7 @@ struct TitleDetailView: View {
                     HStack {
                         Text("Category")
                             .fontWeight(.bold)
-                            .foregroundStyle(colorScheme == .dark ? .orange : .blue)
+                            .foregroundStyle(colorScheme == .dark ? Color.orange : Color.blue)
                         Spacer()
                         Menu {
                             Button("None") {
@@ -1559,7 +1559,7 @@ struct TitleDetailView: View {
                         } label: {
                             Text(title.mediaCategory ?? "Select")
                                 .fontWeight(.bold)
-                                .foregroundStyle(title.mediaCategory == nil ? .secondary : (colorScheme == .dark ? .orange : .blue))
+                                .foregroundColor(title.mediaCategory == nil ? .secondary : (colorScheme == .dark ? Color.orange : Color.blue))
                         }
                     }
                     .font(.subheadline)
