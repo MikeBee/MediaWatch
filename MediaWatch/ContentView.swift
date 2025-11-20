@@ -5273,7 +5273,7 @@ struct HistoryListView: View {
                         }
                     }
                     Spacer()
-                    Text(activity.date.formatted(date: .abbreviated, time: .omitted))
+                    Text(activity.date.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
