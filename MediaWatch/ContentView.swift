@@ -651,10 +651,9 @@ struct ListsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Lists Content
-                    if filteredAndSortedLists.isEmpty {
+            Group {
+                if filteredAndSortedLists.isEmpty {
+                    ScrollView {
                         VStack(spacing: 16) {
                             Image(systemName: "list.bullet.rectangle")
                                 .font(.system(size: 50))
@@ -671,56 +670,59 @@ struct ListsView: View {
                         }
                         .padding(.top, 40)
                         .padding(.horizontal, 40)
-                    } else {
-                        switch viewMode {
-                        case .carousel:
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 16) {
+                    }
+                } else if viewMode == .list && sortMode == .manual {
+                    // Use List for manual reordering
+                    List {
+                        ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                            NavigationLink {
+                                ListDetailView(list: list)
+                            } label: {
+                                ListRowCard(list: list, showDragHandle: true)
+                            }
+                        }
+                        .onMove { source, destination in
+                            moveList(from: source, to: destination)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .environment(\.editMode, .constant(.active))
+                } else {
+                    // Use ScrollView for all other modes
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            switch viewMode {
+                            case .carousel:
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    LazyHStack(alignment: .top, spacing: 16) {
+                                        ForEach(filteredAndSortedLists, id: \.objectID) { list in
+                                            NavigationLink {
+                                                ListDetailView(list: list)
+                                            } label: {
+                                                ListCarouselCard(list: list)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+
+                            case .grid:
+                                LazyVGrid(columns: [
+                                    GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
+                                ], alignment: .leading, spacing: 16) {
                                     ForEach(filteredAndSortedLists, id: \.objectID) { list in
                                         NavigationLink {
                                             ListDetailView(list: list)
                                         } label: {
-                                            ListCarouselCard(list: list)
+                                            ListGridCard(list: list)
                                         }
                                         .buttonStyle(.plain)
                                     }
                                 }
                                 .padding(.horizontal)
-                            }
 
-                        case .grid:
-                            LazyVGrid(columns: [
-                                GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
-                            ], alignment: .leading, spacing: 16) {
-                                ForEach(filteredAndSortedLists, id: \.objectID) { list in
-                                    NavigationLink {
-                                        ListDetailView(list: list)
-                                    } label: {
-                                        ListGridCard(list: list)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal)
-
-                        case .list:
-                            if sortMode == .manual {
-                                // Manual reordering enabled
-                                List {
-                                    ForEach(filteredAndSortedLists, id: \.objectID) { list in
-                                        NavigationLink {
-                                            ListDetailView(list: list)
-                                        } label: {
-                                            ListRowCard(list: list, showDragHandle: true)
-                                        }
-                                    }
-                                    .onMove { source, destination in
-                                        moveList(from: source, to: destination)
-                                    }
-                                }
-                                .listStyle(.plain)
-                                .environment(\.editMode, .constant(.active))
-                            } else {
+                            case .list:
                                 LazyVStack(spacing: 0) {
                                     ForEach(filteredAndSortedLists, id: \.objectID) { list in
                                         NavigationLink {
@@ -735,9 +737,9 @@ struct ListsView: View {
                                 .padding(.horizontal)
                             }
                         }
+                        .padding(.top)
                     }
                 }
-                .padding(.top)
             }
             .navigationTitle("Lists")
             .toolbar {
