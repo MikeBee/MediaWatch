@@ -129,6 +129,7 @@ actor BackupService {
         let runtime: Int
         let watched: Bool
         let watchedDate: Date?
+        let isStarred: Bool
     }
 
     struct NoteBackup: Codable {
@@ -263,7 +264,8 @@ actor BackupService {
                     airDate: episode.airDate,
                     runtime: Int(episode.runtime),
                     watched: episode.watched,
-                    watchedDate: episode.watchedDate
+                    watchedDate: episode.watchedDate,
+                    isStarred: episode.isStarred
                 )
             }
         }
@@ -371,6 +373,7 @@ actor BackupService {
                 episode.runtime = Int16(episodeBackup.runtime)
                 episode.watched = episodeBackup.watched
                 episode.watchedDate = episodeBackup.watchedDate
+                episode.isStarred = episodeBackup.isStarred
                 episode.show = titleMap[episodeBackup.showTmdbId]
             }
 
@@ -448,6 +451,9 @@ actor BackupService {
                 NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [context])
             }
         }
+
+        // Save to ensure all deletions are persisted before restore
+        try context.save()
 
         // Reset the context to clear any remaining cached objects
         context.reset()
