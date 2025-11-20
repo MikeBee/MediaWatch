@@ -4846,28 +4846,23 @@ struct ActivityView: View {
                 // Episodes Watched Section
                 Section("Episodes Watched") {
                     let allEpisodes = tvShows.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
-                    let watchedEpisodes = allEpisodes.filter { $0.watched }
-                    let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-                    let recentWatched = watchedEpisodes.filter { episode in
-                        if let date = episode.watchedDate {
-                            return date >= thirtyDaysAgo
+                    let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+                    let recentWatched = allEpisodes.filter { episode in
+                        if episode.watched, let date = episode.watchedDate {
+                            return date >= sixtyDaysAgo
                         }
                         return false
                     }
 
-                    HStack {
-                        Text("Total episodes watched")
-                        Spacer()
-                        Text("\(watchedEpisodes.count)")
-                            .fontWeight(.bold)
-                    }
-
-                    HStack {
-                        Text("Last 30 days")
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("\(recentWatched.count)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        Text("episodes watched in the last 60 days")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 4)
                 }
 
                 // Most Popular Section
@@ -5183,6 +5178,40 @@ struct HistoryListView: View {
                     icon: "checkmark.circle.fill",
                     color: .green
                 ))
+            }
+
+            // Individual episodes watched
+            if let episodes = title.episodes as? Set<Episode> {
+                for episode in episodes {
+                    if episode.watched, let date = episode.watchedDate, date >= oneYearAgo {
+                        let episodeLabel = "S\(episode.seasonNumber)E\(episode.episodeNumber)"
+                        events.append(ActivityEvent(
+                            date: date,
+                            type: .watched,
+                            title: title.title ?? "Unknown",
+                            detail: "\(episodeLabel) - \(episode.name ?? "")",
+                            icon: "play.circle.fill",
+                            color: .blue
+                        ))
+                    }
+
+                    // Individual episodes starred/favorited
+                    if episode.isStarred {
+                        // Use the show's dateModified as a proxy for when the episode was starred
+                        // since episodes don't have their own dateModified field
+                        if let date = title.dateModified, date >= oneYearAgo {
+                            let episodeLabel = "S\(episode.seasonNumber)E\(episode.episodeNumber)"
+                            events.append(ActivityEvent(
+                                date: date,
+                                type: .favorited,
+                                title: title.title ?? "Unknown",
+                                detail: "\(episodeLabel) - \(episode.name ?? "")",
+                                icon: "star.fill",
+                                color: .yellow
+                            ))
+                        }
+                    }
+                }
             }
         }
 
