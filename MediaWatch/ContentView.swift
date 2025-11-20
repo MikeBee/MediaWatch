@@ -1032,11 +1032,11 @@ struct ListDetailView: View {
 
                     Divider()
 
-                    // Delete
+                    // Remove
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
-                        Label("Delete List", systemImage: "trash")
+                        Label("Remove List", systemImage: "trash")
                     }
                     .disabled(list.isDefault)
                 } label: {
@@ -1080,15 +1080,15 @@ struct ListDetailView: View {
         } message: {
             Text("Enter a new name for this list")
         }
-        .alert("Delete List", isPresented: $showDeleteConfirmation) {
+        .alert("Remove List", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+            Button("Remove", role: .destructive) {
                 viewContext.delete(list)
                 try? viewContext.save()
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to delete \"\(list.name ?? "this list")\"? This action cannot be undone.")
+            Text("Are you sure you want to remove \"\(list.name ?? "this list")\"? This action cannot be undone.")
         }
     }
 
@@ -1485,7 +1485,7 @@ struct TitleDetailView: View {
                         } label: {
                             Image(systemName: title.isFavorite ? "star.fill" : "star")
                                 .font(.title2)
-                                .foregroundStyle(title.isFavorite ? .yellow : .secondary)
+                                .foregroundStyle(title.isFavorite ? .yellow : Color(.lightGray))
                         }
                     }
 
@@ -4369,10 +4369,15 @@ struct ActivityView: View {
                         }
                         return false
                     }
-                    HStack {
-                        Text("\(recentShows.count) shows added in the last 60 days")
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(recentShows.count)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        Text("shows added in the last 60 days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 4)
                 }
 
                 // Top Show Genres Section
@@ -4493,7 +4498,7 @@ struct MostPopularSection: View {
     @State private var showClearAlert = false
 
     var body: some View {
-        Section("Most Popular") {
+        Section {
             let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
 
             let popularShows = allTitles.compactMap { title -> (Title, Int, Int)? in
@@ -4542,6 +4547,14 @@ struct MostPopularSection: View {
                     showClearAlert = true
                 }
                 .foregroundStyle(.red)
+            }
+        } header: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Most Popular")
+                Text("in last 60 days")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.none)
             }
         }
         .alert("Clear Counts", isPresented: $showClearAlert) {
