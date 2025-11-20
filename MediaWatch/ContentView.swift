@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import CloudKit
 
 struct ContentView: View {
 
@@ -604,9 +605,14 @@ struct ListCard: View {
 
 struct ListDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var persistenceController: PersistenceController
     @ObservedObject var list: MediaList
 
     @State private var viewMode: ViewMode = .grid
+    @State private var showShareSheet = false
+    @State private var share: CKShare?
+    @State private var isPreparingShare = false
+    @State private var shareError: String?
 
     enum ViewMode {
         case grid, list
@@ -672,10 +678,72 @@ struct ListDetailView: View {
                     Divider()
 
                     // CloudKit Sharing
-                    ShareListButton(list: list)
+                    Button {
+                        Task {
+                            await prepareShare()
+                        }
+                    } label: {
+                        if isPreparingShare {
+                            Label("Preparing...", systemImage: "hourglass")
+                        } else {
+                            Label(
+                                persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
+                                systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
+                            )
+                        }
+                    }
+                    .disabled(isPreparingShare)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let share = share {
+                CloudSharingView(
+                    share: share,
+                    container: CKContainer(identifier: "iCloud.com.mediawatch.app"),
+                    list: list
+                )
+            }
+        }
+        .alert("Sharing Error", isPresented: .constant(shareError != nil)) {
+            Button("OK") {
+                shareError = nil
+            }
+        } message: {
+            if let error = shareError {
+                Text(error)
+            }
+        }
+    }
+
+    private func prepareShare() async {
+        isPreparingShare = true
+
+        do {
+            // Check if already shared
+            if let existingShare = persistenceController.share(for: list) {
+                share = existingShare
+            } else {
+                // Mark list as shared in Core Data
+                await MainActor.run {
+                    list.isShared = true
+                    try? persistenceController.viewContext.save()
+                }
+
+                // Create new share
+                share = try await persistenceController.shareList(list)
+            }
+
+            await MainActor.run {
+                isPreparingShare = false
+                showShareSheet = true
+            }
+        } catch {
+            await MainActor.run {
+                isPreparingShare = false
+                shareError = "Failed to create share: \(error.localizedDescription)"
             }
         }
     }
@@ -1564,6 +1632,34 @@ struct TitleDetailView: View {
 
             // Seasons list with episodes
             if !seasons.isEmpty {
+                // Expand/Collapse All buttons
+                HStack {
+                    Button {
+                        withAnimation {
+                            expandedSeasons = Set(seasons.map { $0.key })
+                        }
+                    } label: {
+                        Label("Expand All", systemImage: "chevron.down.2")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+
+                    Button {
+                        withAnimation {
+                            expandedSeasons.removeAll()
+                        }
+                    } label: {
+                        Label("Collapse All", systemImage: "chevron.up.2")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+
+                    Spacer()
+                }
+                .padding(.bottom, 4)
+
                 ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
                     VStack(spacing: 0) {
                         // Season header
@@ -1602,6 +1698,9 @@ struct TitleDetailView: View {
                                             ep.watchedDate = Date()
                                         }
                                     }
+                                    // Update title to trigger UI refresh
+                                    title.dateModified = Date()
+                                    title.objectWillChange.send()
                                     try? viewContext.save()
                                     episodeRefreshTrigger.toggle()
                                 } label: {
@@ -1625,6 +1724,9 @@ struct TitleDetailView: View {
                                                 if episode.watched {
                                                     episode.watchedDate = Date()
                                                 }
+                                                // Update title to trigger UI refresh
+                                                title.dateModified = Date()
+                                                title.objectWillChange.send()
                                                 try? viewContext.save()
                                                 episodeRefreshTrigger.toggle()
                                             } label: {
@@ -3127,7 +3229,7 @@ struct ProfileView: View {
                         }
                     } label: {
                         HStack {
-                            Label("Backup Data", systemImage: "arrow.up.doc")
+                            Label("Export to JSON", systemImage: "square.and.arrow.up")
                             Spacer()
                             if isBackingUp {
                                 ProgressView()
@@ -3141,7 +3243,7 @@ struct ProfileView: View {
                         showingRestoreImporter = true
                     } label: {
                         HStack {
-                            Label("Restore from Backup", systemImage: "arrow.down.doc")
+                            Label("Import from JSON", systemImage: "square.and.arrow.down")
                             Spacer()
                             if isRestoring {
                                 ProgressView()
