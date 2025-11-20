@@ -1651,19 +1651,19 @@ struct TitleDetailView: View {
                 }
 
                 // Average Rating
-                if title.lauraRating > 0 || title.mikeRating > 0 {
-                    HStack {
-                        Text("Avg")
-                            .frame(width: 50, alignment: .leading)
-                        let avgRating = (title.lauraRating > 0 && title.mikeRating > 0)
-                            ? (title.lauraRating + title.mikeRating) / 2.0
-                            : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
-                        ForEach(1...5, id: \.self) { star in
-                            Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
-                                .font(.title2)
-                                .foregroundStyle(.yellow)
-                        }
-                        Spacer()
+                HStack {
+                    Text("Avg")
+                        .frame(width: 50, alignment: .leading)
+                    let avgRating = (title.lauraRating > 0 && title.mikeRating > 0)
+                        ? (title.lauraRating + title.mikeRating) / 2.0
+                        : (title.lauraRating > 0 ? title.lauraRating : title.mikeRating)
+                    ForEach(1...5, id: \.self) { star in
+                        Image(systemName: Double(star) <= avgRating ? "star.fill" : (Double(star) - 0.5 <= avgRating ? "star.leadinghalf.filled" : "star"))
+                            .font(.title2)
+                            .foregroundStyle(.yellow)
+                    }
+                    Spacer()
+                    if avgRating > 0 {
                         Text(String(format: "%.1f", avgRating))
                             .font(.title2)
                             .fontWeight(.bold)
@@ -4177,13 +4177,6 @@ struct StarRatingView: View {
                             rating = starValue
                         }
                     }
-            }
-
-            if rating > 0 {
-                Text(String(format: "%.1f", rating))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
             }
         }
         .font(.title2)
