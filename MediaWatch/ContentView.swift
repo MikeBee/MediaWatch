@@ -831,38 +831,14 @@ struct ListDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    // View mode
-                    Menu {
-                        Button {
-                            viewMode = .grid
-                        } label: {
-                            Label("Grid View", systemImage: viewMode == .grid ? "checkmark" : "square.grid.2x2")
-                        }
-                        Button {
-                            viewMode = .list
-                        } label: {
-                            Label("List View", systemImage: viewMode == .list ? "checkmark" : "list.bullet")
-                        }
-                    } label: {
-                        Label("View", systemImage: viewMode == .grid ? "square.grid.2x2" : "list.bullet")
-                    }
-
                     // Sort options
-                    Menu {
-                        ForEach(ListSortOption.allCases, id: \.self) { option in
-                            Button {
-                                sortOption = option
-                            } label: {
-                                HStack {
-                                    Label(option.label, systemImage: option.icon)
-                                    if sortOption == option {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
+                    Section("Sort By") {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(ListSortOption.allCases, id: \.self) { option in
+                                Label(option.label, systemImage: option.icon)
+                                    .tag(option)
                             }
                         }
-
-                        Divider()
 
                         Button {
                             sortAscending.toggle()
@@ -872,56 +848,58 @@ struct ListDetailView: View {
                                 systemImage: sortAscending ? "arrow.up" : "arrow.down"
                             )
                         }
-                    } label: {
-                        Label("Sort", systemImage: "arrow.up.arrow.down")
                     }
 
                     // Group options
-                    Menu {
-                        ForEach(ListGroupOption.allCases, id: \.self) { option in
-                            Button {
-                                groupOption = option
-                            } label: {
-                                HStack {
-                                    Label(option.label, systemImage: option.icon)
-                                    if groupOption == option {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
+                    Section("Group By") {
+                        Picker("Group", selection: $groupOption) {
+                            ForEach(ListGroupOption.allCases, id: \.self) { option in
+                                Label(option.label, systemImage: option.icon)
+                                    .tag(option)
                             }
                         }
-                    } label: {
-                        Label("Group", systemImage: "rectangle.3.group")
                     }
 
-                    // Filter
-                    Button {
-                        showFilterSheet = true
-                    } label: {
-                        Label(
-                            activeFilterCount > 0 ? "Filter (\(activeFilterCount))" : "Filter",
-                            systemImage: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                        )
-                    }
-
-                    Divider()
-
-                    // CloudKit Sharing
-                    Button {
-                        Task {
-                            await prepareShare()
-                        }
-                    } label: {
-                        if isPreparingShare {
-                            Label("Preparing...", systemImage: "hourglass")
-                        } else {
+                    Section {
+                        // Filter
+                        Button {
+                            showFilterSheet = true
+                        } label: {
                             Label(
-                                persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
-                                systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
+                                activeFilterCount > 0 ? "Filter (\(activeFilterCount))" : "Filter",
+                                systemImage: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
                             )
                         }
                     }
-                    .disabled(isPreparingShare)
+
+                    Section {
+                        // View mode
+                        Button {
+                            viewMode = viewMode == .grid ? .list : .grid
+                        } label: {
+                            Label(
+                                viewMode == .grid ? "List View" : "Grid View",
+                                systemImage: viewMode == .grid ? "list.bullet" : "square.grid.2x2"
+                            )
+                        }
+
+                        // CloudKit Sharing
+                        Button {
+                            Task {
+                                await prepareShare()
+                            }
+                        } label: {
+                            if isPreparingShare {
+                                Label("Preparing...", systemImage: "hourglass")
+                            } else {
+                                Label(
+                                    persistenceController.isShared(list) ? "Manage Sharing" : "Share List",
+                                    systemImage: persistenceController.isShared(list) ? "person.2.fill" : "person.badge.plus"
+                                )
+                            }
+                        }
+                        .disabled(isPreparingShare)
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
