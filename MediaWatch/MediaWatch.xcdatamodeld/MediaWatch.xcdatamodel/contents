@@ -4,6 +4,7 @@
         <attribute name="airDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="episodeNumber" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isStarred" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="localStillPath" optional="YES" attributeType="String"/>
         <attribute name="name" attributeType="String" defaultValueString=""/>
         <attribute name="overview" optional="YES" attributeType="String"/>
@@ -55,11 +56,16 @@
         <attribute name="castData" optional="YES" attributeType="Binary"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="imdbId" optional="YES" attributeType="String"/>
+        <attribute name="isFavorite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastAirDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastWatched" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lauraRating" optional="YES" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="likedStatus" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="localBackdropPath" optional="YES" attributeType="String"/>
         <attribute name="localPosterPath" optional="YES" attributeType="String"/>
+        <attribute name="mediaCategory" optional="YES" attributeType="String"/>
         <attribute name="mediaType" attributeType="String" defaultValueString="movie"/>
+        <attribute name="mikeRating" optional="YES" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="numberOfEpisodes" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="numberOfSeasons" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="originalLanguage" optional="YES" attributeType="String"/>
@@ -69,6 +75,7 @@
         <attribute name="posterPath" optional="YES" attributeType="String"/>
         <attribute name="releaseDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="runtime" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="startDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="status" optional="YES" attributeType="String"/>
         <attribute name="streamingService" optional="YES" attributeType="String"/>
         <attribute name="title" attributeType="String" defaultValueString=""/>
@@ -78,7 +85,7 @@
         <attribute name="voteCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="watched" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="watchedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="watchStatus" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="watchStatus" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
         <attribute name="year" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="episodes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Episode" inverseName="show" inverseEntity="Episode"/>
         <relationship name="listItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ListItem" inverseName="title" inverseEntity="ListItem"/>

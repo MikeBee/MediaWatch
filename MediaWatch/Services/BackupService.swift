@@ -431,7 +431,8 @@ actor BackupService {
     }
 
     private func clearAllData(context: NSManagedObjectContext) throws {
-        let entityNames = ["Note", "Episode", "ListItem", "Title", "MediaList", "UserPreferences"]
+        // Note: Entity name is "List" in Core Data model, class is "MediaList"
+        let entityNames = ["Note", "Episode", "ListItem", "Title", "List", "UserPreferences"]
 
         for entityName in entityNames {
             let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
