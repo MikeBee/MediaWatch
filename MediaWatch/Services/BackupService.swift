@@ -432,13 +432,25 @@ actor BackupService {
 
     private func clearAllData(context: NSManagedObjectContext) throws {
         // Note: Entity name is "List" in Core Data model, class is "MediaList"
-        let entityNames = ["Note", "Episode", "ListItem", "Title", "List", "UserPreferences"]
+        // Order matters: delete dependent entities first
+        let entityNames = ["Note", "ListItem", "Episode", "UserPreferences", "Title", "List"]
 
         for entityName in entityNames {
             let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-            try context.execute(deleteRequest)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            let result = try context.execute(deleteRequest) as? NSBatchDeleteResult
+
+            // Merge changes into the context to ensure cached objects are cleared
+            if let objectIDs = result?.result as? [NSManagedObjectID] {
+                let changes = [NSDeletedObjectsKey: objectIDs]
+                NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [context])
+            }
         }
+
+        // Reset the context to clear any remaining cached objects
+        context.reset()
     }
 }
 

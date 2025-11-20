@@ -409,6 +409,7 @@ struct HomeView: View {
                                     .fontWeight(.medium)
                                     .lineLimit(2)
                             }
+                            .frame(maxHeight: .infinity, alignment: .top)
                         }
                         .buttonStyle(.plain)
                     }
@@ -652,119 +653,6 @@ struct ListsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Control Bar
-                    VStack(spacing: 12) {
-                        // New List Button
-                        Button {
-                            showingNewListSheet = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                Text("New List")
-                                    .font(.headline)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding()
-                            .background(Color.accentColor.opacity(0.2))
-                            .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-
-                        // Controls
-                        HStack(spacing: 8) {
-                            // Sort Menu
-                            Menu {
-                                ForEach(ListSortMode.allCases, id: \.self) { mode in
-                                    Button {
-                                        sortMode = mode
-                                    } label: {
-                                        HStack {
-                                            Text(mode.rawValue)
-                                            if sortMode == mode {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.up.arrow.down")
-                                    Text(sortMode.rawValue)
-                                }
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
-                            }
-
-                            // Sort Direction
-                            Button {
-                                isAscending.toggle()
-                            } label: {
-                                Image(systemName: isAscending ? "chevron.up" : "chevron.down")
-                                    .font(.caption)
-                                    .padding(6)
-                                    .background(Color(.systemGray5))
-                                    .cornerRadius(8)
-                            }
-
-                            // Filter Menu
-                            Menu {
-                                ForEach(ListFilterMode.allCases, id: \.self) { mode in
-                                    Button {
-                                        filterMode = mode
-                                    } label: {
-                                        HStack {
-                                            Text(mode.displayName)
-                                            if filterMode == mode {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "line.3.horizontal.decrease.circle")
-                                    Text(filterMode.displayName)
-                                }
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
-                            }
-
-                            Spacer()
-
-                            // View Mode Menu
-                            Menu {
-                                ForEach(ListViewMode.allCases, id: \.self) { mode in
-                                    Button {
-                                        viewMode = mode
-                                    } label: {
-                                        HStack {
-                                            Text(mode.rawValue)
-                                            if viewMode == mode {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
-                                    .font(.caption)
-                                    .padding(6)
-                                    .background(Color(.systemGray5))
-                                    .cornerRadius(8)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-
                     // Lists Content
                     if filteredAndSortedLists.isEmpty {
                         VStack(spacing: 16) {
@@ -818,21 +706,20 @@ struct ListsView: View {
                         case .list:
                             if sortMode == .manual {
                                 // Manual reordering enabled
-                                LazyVStack(spacing: 0) {
+                                List {
                                     ForEach(filteredAndSortedLists, id: \.objectID) { list in
                                         NavigationLink {
                                             ListDetailView(list: list)
                                         } label: {
                                             ListRowCard(list: list, showDragHandle: true)
                                         }
-                                        .buttonStyle(.plain)
-                                        Divider()
                                     }
                                     .onMove { source, destination in
                                         moveList(from: source, to: destination)
                                     }
                                 }
-                                .padding(.horizontal)
+                                .listStyle(.plain)
+                                .environment(\.editMode, .constant(.active))
                             } else {
                                 LazyVStack(spacing: 0) {
                                     ForEach(filteredAndSortedLists, id: \.objectID) { list in
@@ -853,6 +740,63 @@ struct ListsView: View {
                 .padding(.top)
             }
             .navigationTitle("Lists")
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    // Sort menu
+                    Menu {
+                        Picker("Sort", selection: $sortMode) {
+                            ForEach(ListSortMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue)
+                                    .tag(mode)
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            isAscending.toggle()
+                        } label: {
+                            Label(
+                                isAscending ? "Ascending" : "Descending",
+                                systemImage: isAscending ? "arrow.up" : "arrow.down"
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+
+                    // Filter menu
+                    Menu {
+                        Picker("Filter", selection: $filterMode) {
+                            ForEach(ListFilterMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName)
+                                    .tag(mode)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: filterMode == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    }
+
+                    // View Mode menu
+                    Menu {
+                        Picker("View", selection: $viewMode) {
+                            ForEach(ListViewMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue)
+                                    .tag(mode)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
+                    }
+
+                    // New List button
+                    Button {
+                        showingNewListSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
             .sheet(isPresented: $showingNewListSheet) {
                 NewListSheet(
                     name: $newListName,
@@ -1009,6 +953,7 @@ struct ListGridCard: View {
         .padding(12)
         .background(Color(.systemGray6).opacity(0.5))
         .cornerRadius(12)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -1647,6 +1592,7 @@ struct TitleGridItem: View {
                 .fontWeight(.medium)
                 .lineLimit(2)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -3837,6 +3783,7 @@ struct TrendingCard: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
