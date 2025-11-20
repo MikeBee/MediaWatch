@@ -676,10 +676,17 @@ struct ListsView: View {
                     // Use List for manual reordering
                     List {
                         ForEach(filteredAndSortedLists, id: \.objectID) { list in
-                            NavigationLink {
-                                ListDetailView(list: list)
-                            } label: {
-                                ListRowCard(list: list, showDragHandle: editMode.isEditing)
+                            if editMode.isEditing {
+                                // In edit mode, show plain row to allow dragging
+                                ListRowCard(list: list, showDragHandle: true)
+                                    .contentShape(Rectangle())
+                            } else {
+                                // In normal mode, allow navigation
+                                NavigationLink {
+                                    ListDetailView(list: list)
+                                } label: {
+                                    ListRowCard(list: list, showDragHandle: false)
+                                }
                             }
                         }
                         .onMove { source, destination in
@@ -2708,6 +2715,9 @@ struct TitleDetailView: View {
                                             // Episode star
                                             Button {
                                                 episode.isStarred.toggle()
+                                                // Update title dateModified so starred episodes show in History
+                                                title.dateModified = Date()
+                                                title.objectWillChange.send()
                                                 try? viewContext.save()
                                                 episodeRefreshTrigger.toggle()
                                             } label: {
@@ -3038,7 +3048,12 @@ struct EpisodeRow: View {
                 episode.watched.toggle()
                 if episode.watched {
                     episode.watchedDate = Date()
+                    // Update show's lastWatched
+                    episode.show?.lastWatched = Date()
                 }
+                // Update show's dateModified so episode activity shows in History
+                episode.show?.dateModified = Date()
+                episode.show?.objectWillChange.send()
                 try? viewContext.save()
             } label: {
                 Image(systemName: episode.watched ? "checkmark.circle.fill" : "circle")
