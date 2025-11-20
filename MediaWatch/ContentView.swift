@@ -186,8 +186,15 @@ extension Title {
 
 // MARK: - Home View (Dashboard)
 
+enum HomeViewMode: String, CaseIterable {
+    case carousel = "carousel"
+    case grid = "grid"
+    case list = "list"
+}
+
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var viewMode: HomeViewMode = .carousel
 
     // Fetch Current titles
     @FetchRequest(
@@ -238,8 +245,7 @@ struct HomeView: View {
                     if !currentTitles.isEmpty {
                         statusSection(
                             status: .current,
-                            titles: Array(currentTitles),
-                            useCarousel: true
+                            titles: Array(currentTitles)
                         )
                     }
 
@@ -247,8 +253,7 @@ struct HomeView: View {
                     if !newTitles.isEmpty {
                         statusSection(
                             status: .new,
-                            titles: Array(newTitles),
-                            useCarousel: true
+                            titles: Array(newTitles)
                         )
                     }
 
@@ -256,8 +261,7 @@ struct HomeView: View {
                     if !pausedTitles.isEmpty {
                         statusSection(
                             status: .paused,
-                            titles: Array(pausedTitles),
-                            useCarousel: true
+                            titles: Array(pausedTitles)
                         )
                     }
 
@@ -265,8 +269,7 @@ struct HomeView: View {
                     if !maybeTitles.isEmpty {
                         statusSection(
                             status: .maybe,
-                            titles: Array(maybeTitles),
-                            useCarousel: true
+                            titles: Array(maybeTitles)
                         )
                     }
 
@@ -274,8 +277,7 @@ struct HomeView: View {
                     if !finishedTitles.isEmpty {
                         statusSection(
                             status: .finished,
-                            titles: Array(finishedTitles),
-                            useCarousel: true
+                            titles: Array(finishedTitles)
                         )
                     }
 
@@ -305,10 +307,42 @@ struct HomeView: View {
                 .padding(.top)
             }
             .navigationTitle("Home")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            viewMode = .carousel
+                        } label: {
+                            Label("Carousel", systemImage: "rectangle.split.1x2")
+                            if viewMode == .carousel {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        Button {
+                            viewMode = .grid
+                        } label: {
+                            Label("Grid", systemImage: "square.grid.2x2")
+                            if viewMode == .grid {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        Button {
+                            viewMode = .list
+                        } label: {
+                            Label("List", systemImage: "list.bullet")
+                            if viewMode == .list {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
+                    }
+                }
+            }
         }
     }
 
-    private func statusSection(status: WatchStatus, titles: [Title], useCarousel: Bool) -> some View {
+    private func statusSection(status: WatchStatus, titles: [Title]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: status.icon)
@@ -319,9 +353,10 @@ struct HomeView: View {
             }
             .padding(.horizontal)
 
-            if useCarousel {
+            switch viewMode {
+            case .carousel:
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
+                    LazyHStack(alignment: .top, spacing: 16) {
                         ForEach(titles.prefix(10)) { title in
                             NavigationLink {
                                 TitleDetailView(title: title)
@@ -333,6 +368,79 @@ struct HomeView: View {
                     }
                     .padding(.horizontal)
                 }
+
+            case .grid:
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 16)
+                ], alignment: .leading, spacing: 16) {
+                    ForEach(titles) { title in
+                        NavigationLink {
+                            TitleDetailView(title: title)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
+                                    .frame(height: 150)
+                                    .cornerRadius(8)
+
+                                Text(title.title ?? "Unknown")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+
+            case .list:
+                VStack(spacing: 0) {
+                    ForEach(titles) { title in
+                        NavigationLink {
+                            TitleDetailView(title: title)
+                        } label: {
+                            HStack(spacing: 12) {
+                                PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterSmall)
+                                    .frame(width: 50, height: 75)
+                                    .cornerRadius(4)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(title.title ?? "Unknown")
+                                        .font(.headline)
+                                        .lineLimit(1)
+
+                                    if title.mediaType == "tv" {
+                                        Text(title.nextEpisodeBadge)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    if let genres = title.genres, !genres.isEmpty {
+                                        Text(genres.prefix(2).joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+
+                                Spacer()
+
+                                if title.streamingServiceEnum != .none {
+                                    Text(title.streamingServiceEnum.displayName)
+                                        .font(.caption2)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Color(hex: title.streamingServiceEnum.color))
+                                        .foregroundStyle(.white)
+                                        .cornerRadius(3)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
+                }
+                .padding(.horizontal)
             }
         }
     }
@@ -1429,27 +1537,71 @@ struct TitleDetailView: View {
 
     private var datesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if title.startDate != nil || title.lastWatched != nil {
-                if let startDate = title.startDate {
-                    HStack {
-                        Text("Started")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(startDate.formatted(date: .abbreviated, time: .omitted))
-                    }
-                    .font(.subheadline)
-                }
+            // Started date
+            HStack {
+                Text("Started")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if title.startDate != nil {
+                    DatePicker("", selection: Binding(
+                        get: { title.startDate ?? Date() },
+                        set: { newValue in
+                            title.startDate = newValue
+                            try? viewContext.save()
+                        }
+                    ), displayedComponents: .date)
+                    .labelsHidden()
 
-                if let lastWatched = title.lastWatched {
-                    HStack {
-                        Text("Last Watched")
+                    Button {
+                        title.startDate = nil
+                        try? viewContext.save()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(lastWatched.formatted(date: .abbreviated, time: .omitted))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button("Set") {
+                        title.startDate = Date()
+                        try? viewContext.save()
                     }
                     .font(.subheadline)
                 }
             }
+            .font(.subheadline)
+
+            // Last Watched date
+            HStack {
+                Text("Last Watched")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if title.lastWatched != nil {
+                    DatePicker("", selection: Binding(
+                        get: { title.lastWatched ?? Date() },
+                        set: { newValue in
+                            title.lastWatched = newValue
+                            try? viewContext.save()
+                        }
+                    ), displayedComponents: .date)
+                    .labelsHidden()
+
+                    Button {
+                        title.lastWatched = nil
+                        try? viewContext.save()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button("Set") {
+                        title.lastWatched = Date()
+                        try? viewContext.save()
+                    }
+                    .font(.subheadline)
+                }
+            }
+            .font(.subheadline)
         }
     }
 
