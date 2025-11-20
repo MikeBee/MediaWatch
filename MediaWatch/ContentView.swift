@@ -51,6 +51,12 @@ struct ContentView: View {
                     }
                     .tag(Tab.search)
 
+                ActivityView()
+                    .tabItem {
+                        Label("Activity", systemImage: "chart.bar.fill")
+                    }
+                    .tag(Tab.activity)
+
                 ProfileView()
                     .tabItem {
                         Label("Profile", systemImage: "person.fill")
@@ -73,6 +79,7 @@ enum Tab: Hashable {
     case home
     case lists
     case search
+    case activity
     case profile
 }
 
@@ -2190,35 +2197,55 @@ struct TitleDetailView: View {
 
             // Seasons list with episodes
             if !seasons.isEmpty {
-                // Expand/Collapse All buttons
-                HStack {
-                    Button {
-                        withAnimation {
-                            allSeasonsHidden = false
-                            expandedSeasons = Set(seasons.map { $0.key })
-                        }
-                    } label: {
-                        Label("Expand All", systemImage: "chevron.down.2")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
+                // Seasons header with starred count
+                let starredCount = episodes.filter { $0.isStarred }.count
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Seasons")
+                            .font(.headline)
 
-                    Button {
-                        withAnimation {
-                            allSeasonsHidden = true
-                            expandedSeasons.removeAll()
+                        // Expand/Collapse All buttons
+                        HStack(spacing: 8) {
+                            Button {
+                                withAnimation {
+                                    allSeasonsHidden = false
+                                }
+                            } label: {
+                                Label("Expand All", systemImage: "chevron.down.2")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.capsule)
+
+                            Button {
+                                withAnimation {
+                                    allSeasonsHidden = true
+                                    expandedSeasons.removeAll()
+                                }
+                            } label: {
+                                Label("Collapse All", systemImage: "chevron.up.2")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.capsule)
                         }
-                    } label: {
-                        Label("Collapse All", systemImage: "chevron.up.2")
-                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
 
                     Spacer()
+
+                    // Starred episodes count
+                    if starredCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                                .foregroundStyle(.yellow)
+                            Text("Starred episodes: \(starredCount)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 8)
 
                 if !allSeasonsHidden {
                     ForEach(seasons, id: \.key) { seasonNumber, seasonEpisodes in
@@ -4003,11 +4030,6 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             List {
-                // Stats Section
-                Section("Your Stats") {
-                    StatsRow()
-                }
-
                 // Appearance Section
                 Section("Appearance") {
                     Picker("Theme", selection: $appSettings.theme) {
@@ -4250,6 +4272,337 @@ struct ProfileView: View {
                 pendingRestoreData = nil
                 restoreError = "Failed to restore backup: \(error.localizedDescription)"
             }
+        }
+    }
+}
+
+// MARK: - Activity View
+
+struct ActivityView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @State private var showingHistory = false
+
+    @FetchRequest(
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "mediaType == %@", "movie")
+    )
+    private var movies: FetchedResults<Title>
+
+    @FetchRequest(
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "mediaType == %@", "tv")
+    )
+    private var tvShows: FetchedResults<Title>
+
+    @FetchRequest(sortDescriptors: [])
+    private var lists: FetchedResults<MediaList>
+
+    @FetchRequest(sortDescriptors: [])
+    private var allTitles: FetchedResults<Title>
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // Your Stats Section (moved from Profile)
+                Section("Your Stats") {
+                    HStack(spacing: 20) {
+                        StatItem(value: "\(movies.count)", label: "Movies")
+                        Divider()
+                        StatItem(value: "\(tvShows.count)", label: "TV Shows")
+                        Divider()
+                        StatItem(value: "\(lists.count)", label: "Lists")
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                // Category Counts Section
+                Section("Categories") {
+                    ForEach(WatchStatus.allCases, id: \.self) { status in
+                        let count = allTitles.filter { $0.watchStatus == status.rawValue }.count
+                        HStack {
+                            Image(systemName: status.icon)
+                                .foregroundStyle(status.color)
+                            Text(status.label)
+                            Spacer()
+                            Text("\(count)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Episodes Watched Section
+                Section("Episodes Watched") {
+                    let allEpisodes = tvShows.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
+                    let watchedEpisodes = allEpisodes.filter { $0.watched }
+                    let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+                    let recentWatched = watchedEpisodes.filter { episode in
+                        if let date = episode.watchedDate {
+                            return date >= thirtyDaysAgo
+                        }
+                        return false
+                    }
+
+                    HStack {
+                        Text("Total episodes watched")
+                        Spacer()
+                        Text("\(watchedEpisodes.count)")
+                            .fontWeight(.bold)
+                    }
+
+                    HStack {
+                        Text("Last 30 days")
+                        Spacer()
+                        Text("\(recentWatched.count)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Most Popular Section
+                MostPopularSection()
+
+                // Added Shows Section
+                Section("Added Shows") {
+                    let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+                    let recentShows = allTitles.filter { title in
+                        if let date = title.dateAdded {
+                            return date >= sixtyDaysAgo
+                        }
+                        return false
+                    }
+                    HStack {
+                        Text("\(recentShows.count) shows added in the last 60 days")
+                        Spacer()
+                    }
+                }
+
+                // Top Show Genres Section
+                Section("Top Show Genres") {
+                    let allGenres = allTitles.flatMap { ($0.genres as? [String]) ?? [] }
+                    let genreCounts = Dictionary(grouping: allGenres) { $0 }
+                        .mapValues { $0.count }
+                        .sorted { $0.value > $1.value }
+                        .prefix(10)
+
+                    if genreCounts.isEmpty {
+                        Text("No genres available")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        ForEach(Array(genreCounts), id: \.key) { genre, count in
+                            HStack {
+                                Text(genre)
+                                Spacer()
+                                Text("\(count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // Top Streaming Section
+                Section("Top Streaming") {
+                    let networkCounts = Dictionary(grouping: allTitles.compactMap { $0.streamingService }) { $0 }
+                        .mapValues { $0.count }
+                        .sorted { $0.value > $1.value }
+                        .prefix(10)
+
+                    if networkCounts.isEmpty {
+                        Text("No streaming services assigned")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        ForEach(Array(networkCounts), id: \.key) { network, count in
+                            HStack {
+                                Text(network)
+                                Spacer()
+                                Text("\(count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // Favorite Episodes Section
+                Section("Favorite Episodes") {
+                    let allEpisodes = tvShows.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
+                    let starredEpisodes = allEpisodes.filter { $0.isStarred }
+                    let showsWithStarred = Set(starredEpisodes.compactMap { episode in
+                        tvShows.first { show in
+                            ((show.episodes as? Set<Episode>) ?? []).contains(episode)
+                        }
+                    })
+
+                    HStack {
+                        Text("\(starredEpisodes.count) favorited episodes in \(showsWithStarred.count) shows")
+                    }
+
+                    if let topShow = showsWithStarred.max(by: { show1, show2 in
+                        let count1 = ((show1.episodes as? Set<Episode>) ?? []).filter { $0.isStarred }.count
+                        let count2 = ((show2.episodes as? Set<Episode>) ?? []).filter { $0.isStarred }.count
+                        return count1 < count2
+                    }) {
+                        let starredCount = ((topShow.episodes as? Set<Episode>) ?? []).filter { $0.isStarred }.count
+                        HStack {
+                            Text("Show with most favorites:")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            VStack(alignment: .trailing) {
+                                Text(topShow.title ?? "Unknown")
+                                    .fontWeight(.medium)
+                                Text("\(starredCount) episodes")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // History Section
+                Section {
+                    Button {
+                        withAnimation {
+                            showingHistory.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text("History")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: showingHistory ? "chevron.up" : "chevron.down")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if showingHistory {
+                        HistoryListView()
+                    }
+                }
+            }
+            .navigationTitle("Activity")
+        }
+    }
+}
+
+// MARK: - Most Popular Section
+
+struct MostPopularSection: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(sortDescriptors: [])
+    private var allTitles: FetchedResults<Title>
+
+    @State private var showClearAlert = false
+
+    var body: some View {
+        Section("Most Popular") {
+            let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+
+            let popularShows = allTitles.compactMap { title -> (Title, Int, Int)? in
+                guard title.mediaType == "tv" else { return nil }
+                let episodes = (title.episodes as? Set<Episode>) ?? []
+                let recentWatched = episodes.filter { episode in
+                    episode.watched && (episode.watchedDate ?? Date.distantPast) >= sixtyDaysAgo
+                }
+                let starredCount = episodes.filter { $0.isStarred }.count
+                guard !recentWatched.isEmpty else { return nil }
+                return (title, recentWatched.count, starredCount)
+            }
+            .sorted { $0.1 > $1.1 }
+
+            if popularShows.isEmpty {
+                Text("No shows watched in the last 60 days")
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
+            } else {
+                ForEach(popularShows, id: \.0.id) { title, watchedCount, starredCount in
+                    HStack {
+                        Text(title.title ?? "Unknown")
+                        Spacer()
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                                Text("\(watchedCount)")
+                                    .font(.caption)
+                            }
+                            if starredCount > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.yellow)
+                                    Text("\(starredCount)")
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Button("Clear Counts") {
+                    showClearAlert = true
+                }
+                .foregroundStyle(.red)
+            }
+        }
+        .alert("Clear Counts", isPresented: $showClearAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear", role: .destructive) {
+                clearCounts()
+            }
+        } message: {
+            Text("This will clear the watch dates for all episodes, resetting the activity tracking. This action cannot be undone.")
+        }
+    }
+
+    private func clearCounts() {
+        let allEpisodes = allTitles.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
+        for episode in allEpisodes {
+            episode.watchedDate = nil
+        }
+        try? viewContext.save()
+    }
+}
+
+// MARK: - History List View
+
+struct HistoryListView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(sortDescriptors: [])
+    private var allTitles: FetchedResults<Title>
+
+    var body: some View {
+        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
+        let recentTitles = allTitles.filter { title in
+            if let date = title.dateAdded {
+                return date >= oneYearAgo
+            }
+            return false
+        }
+        .sorted { ($0.dateAdded ?? Date.distantPast) > ($1.dateAdded ?? Date.distantPast) }
+
+        ForEach(recentTitles) { title in
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    Text("Added: \(title.title ?? "Unknown")")
+                        .font(.subheadline)
+                    Spacer()
+                    if let date = title.dateAdded {
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+
+        if recentTitles.isEmpty {
+            Text("No activity in the last year")
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
         }
     }
 }
