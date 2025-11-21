@@ -55,7 +55,7 @@ struct CloudSharingView: UIViewControllerRepresentable {
         }
 
         func itemType(for csc: UICloudSharingController) -> String? {
-            "com.mediawatch.list"
+            "com.mediashows.list"
         }
     }
 }
@@ -92,7 +92,7 @@ struct ShareListButton: View {
             if let share = share {
                 CloudSharingView(
                     share: share,
-                    container: CKContainer(identifier: "iCloud.com.mediawatch.app"),
+                    container: CKContainer(identifier: "iCloud.com.mediashows.app"),
                     list: list
                 )
             }

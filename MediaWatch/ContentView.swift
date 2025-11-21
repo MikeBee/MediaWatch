@@ -1423,7 +1423,7 @@ struct ListDetailView: View {
             if let share = share {
                 CloudSharingView(
                     share: share,
-                    container: CKContainer(identifier: "iCloud.com.mediawatch.app"),
+                    container: CKContainer(identifier: "iCloud.com.mediashows.app"),
                     list: list
                 )
             }
@@ -4163,6 +4163,7 @@ struct AddToListSheet: View {
                 }
             }
             .onAppear {
+                
                 fetchLists()
             }
         }
@@ -4692,7 +4693,7 @@ struct ProfileView: View {
                 isPresented: $showingBackupExporter,
                 document: BackupDocument(data: backupData ?? Data()),
                 contentType: .json,
-                defaultFilename: "MediaWatch-Backup-\(formatDateForFilename()).json"
+                defaultFilename: "MediaShows-Backup-\(formatDateForFilename()).json"
             ) { result in
                 switch result {
                 case .success:

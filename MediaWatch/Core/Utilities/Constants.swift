@@ -13,13 +13,13 @@ enum Constants {
 
     enum App {
         static let name = "MediaWatch"
-        static let bundleIdentifier = "com.mediawatch.app"
+        static let bundleIdentifier = "com.mediashows.app"
     }
 
     // MARK: - CloudKit
 
     enum CloudKit {
-        static let containerIdentifier = "iCloud.com.mediawatch.app"
+        static let containerIdentifier = "iCloud.com.MediaShows.app" //was mediawatch
     }
 
     // MARK: - TMDb API

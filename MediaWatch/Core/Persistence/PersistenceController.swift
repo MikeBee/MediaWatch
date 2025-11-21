@@ -1,6 +1,6 @@
 //
 //  PersistenceController.swift
-//  MediaWatch
+//  MediaShows
 //
 //  Core Data + CloudKit persistence controller with sharing support
 //
@@ -25,7 +25,7 @@ final class PersistenceController: ObservableObject {
         // Create sample list
         let list = MediaList(context: context)
         list.id = UUID()
-        list.name = "Watchlist"
+        list.name = "Shared" //was "Watchlist"
         list.icon = "list.bullet"
         list.sortOrder = 0
         list.isDefault = true
@@ -95,6 +95,7 @@ final class PersistenceController: ObservableObject {
 
         do {
             try context.save()
+            print("Saved line 98 to Core Data / CloudKit")
         } catch {
             let nsError = error as NSError
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
@@ -111,7 +112,7 @@ final class PersistenceController: ObservableObject {
     private var sharedStore: NSPersistentStore?
 
     /// CloudKit container identifier
-    private let cloudKitContainerIdentifier = "iCloud.com.mediawatch.app"
+    private let cloudKitContainerIdentifier = "iCloud.reasonality.MediaShows" //was iCloud.com.MediaShows.app"
 
     // MARK: - Computed Properties
 
@@ -122,7 +123,7 @@ final class PersistenceController: ObservableObject {
     // MARK: - Initialization
 
     init(inMemory: Bool = false) {
-        container = NSPersistentCloudKitContainer(name: "MediaWatch")
+        container = NSPersistentCloudKitContainer(name: "MediaShows") //container = NSPersistentCloudKitContainer(name: "MediaShows")
 
         if inMemory {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
@@ -132,6 +133,9 @@ final class PersistenceController: ObservableObject {
 
         // Configure store descriptions for history tracking
         container.persistentStoreDescriptions.forEach { description in
+            print("Final store description: \(description.url?.lastPathComponent ?? "nil")") //meb
+            print("CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+            print("Database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
         }
@@ -142,6 +146,11 @@ final class PersistenceController: ObservableObject {
                 fatalError("Failed to load persistent store: \(error), \(error.userInfo)")
             }
 
+            print("Loaded store URL: \(description.url?.absoluteString ?? "nil")")  //meb
+            print("Loaded CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+            print("Loaded database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)") //meb
+
+            
             // Track which store is which
             if description.cloudKitContainerOptions?.databaseScope == .shared {
                 self?.sharedStore = self?.container.persistentStoreCoordinator.persistentStore(for: description.url!)
@@ -179,16 +188,25 @@ final class PersistenceController: ObservableObject {
             containerIdentifier: cloudKitContainerIdentifier
         )
 
+        print("Private store URL: \(description.url?.absoluteString ?? "nil")") //meb
+        print("Private CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+
+        
         // Configure shared store
         let sharedStoreURL = description.url!
             .deletingLastPathComponent()
-            .appendingPathComponent("MediaWatch-shared.sqlite")
+            .appendingPathComponent("MediaShows-shared.sqlite")
 
         let sharedDescription = NSPersistentStoreDescription(url: sharedStoreURL)
         sharedDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
             containerIdentifier: cloudKitContainerIdentifier
         )
         sharedDescription.cloudKitContainerOptions?.databaseScope = .shared
+        
+        print("Shared store URL: \(sharedDescription.url?.absoluteString ?? "nil")")  //meb
+        print("Shared CloudKit container: \(sharedDescription.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+        print("Shared database scope: \(sharedDescription.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
+        
 
         // Enable history tracking for shared store
         sharedDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
@@ -216,6 +234,7 @@ final class PersistenceController: ObservableObject {
 
         do {
             try context.save()
+            print("Saved movie to Core Data / CloudKit")
             return true
         } catch {
             let nsError = error as NSError
@@ -228,6 +247,7 @@ final class PersistenceController: ObservableObject {
     func save(context: NSManagedObjectContext) throws {
         guard context.hasChanges else { return }
         try context.save()
+        print("Saved content line 232  to Core Data / CloudKit")
     }
 
     // MARK: - Sharing

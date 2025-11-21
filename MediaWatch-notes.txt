@@ -1,0 +1,82 @@
+Only Murders
+Grace & Frankie
+The Daytripper
+
+The morning show
+
+south park
+Palm royale
+
+New features: for season list "Expand All" it just expands to show the seasons, not all of the episodes.  Each season still has individual expand/collapse buttons.
+Have a section header always visible for "Seasons" that has the Expand All and Collapse All below it.  And next to Seasons section header it shows "Starred episodes: XX" to show the count of total episodes in all seasons.
+Add another tab section for Activity which contains stats and activity.  Move the "Your Stats" section form Profile to Activity.
+Below that show a similar Category list where it shows the count in each category like Current, New, Paused,Maybe, and Finished.
+Add Stat for "Total episodes watched" and show "XX in the last 30 days" for the number of episodes watched in the last 30 days.
+Add "Most Popular" section where it shows a list of any show that had an episode clicked as watched in the last 60 days.  For each row, show the title of the show and next to it the count of episodes watched and another column for count of favorite episodes checked.  below that section have a link to clear out the counts.
+The next section to add is "Added Shows" which shows "XX shows added in the last 60 days"
+The next section is "Top show genres" and a list of genres and count of shows in that genre.
+The next section is "Top streaming" and a list of networks and count of shows for each of them
+Then a section of "Favorite episodes" and a count "XX favorited episodes in XX shows" where it shows a count of all episodes across all shows and it shows the the count of shows with any favorited episodes.  Beneath that it shows "Show with most favorites: " then lists that show and count.
+  
+Also in Activity show a collapsible History list of all individual changes/additions/deletions for the last year like favorites tagged, removed, shows added, status changes, etc.  This History list should be at the bottom of the page since it may be lengthy.
+======
+I want to design and develop an iOS app for tracking TV shows and movies. The app must be **extremely simple, easy to use, and private**, while allowing **sharing of lists with another user** (like my spouse) via iCloud/CloudKit. It must have both an iphone view and take advantage of ipad additional views. Please generate detailed feature requirements, data models, and architecture for implementation.
+
+Requirements:
+
+1. Core Features:
+   - Track Movies and TV Shows, each with:
+       - Title, year, synopsis, genres, runtime
+       - External IDs: TMDb (required), IMDb (optional)
+       - Poster/backdrop images (cached locally)
+   - TV Shows must track episodes with season/episode numbers, names, and optional synopsis.
+   - User can mark watched/unwatched per episode or movie.
+   - Liked status: simple tri-state {Liked, Neutral, Disliked}.
+   - Notes per title or episode: private by default; plaintext or markdown.
+   - Lists:
+       - Every title must belong to at least one list (cannot exist outside a list).
+       - User can create multiple lists.
+       - Lists can be shared with other Apple ID users using CloudKit sharing.
+   - CloudKit two-way sync for personal and shared data.
+   - Backup & restore:
+       - Export/import JSON or ZIP including images.
+       - Optional iCloud Drive backup.
+   - Search and add titles:
+       - Must select a list during the add flow.
+       - Optional: add note and liked status.
+
+2. Removed Features:
+   - No notifications or widgets.
+   - No monetization.
+   - No “Add to Library” separate from “Add to List”.
+
+3. Data Model (entities & relationships):
+   - Title: includes fields above; must belong to at least one List.
+   - Episode: associated with Title; season, episode number, name, watched, watchedDate.
+   - List: name, shared flag, owner, items.
+   - ListItem: reference to Title, order index, required.
+   - Note: text, ownerOnly flag, scope (Title or Episode).
+   - UserDevice/Metadata: deviceId, lastSyncDate, appVersion.
+
+4. CloudKit:
+   - Use NSPersistentCloudKitContainer for private and shared zones.
+   - CKShare for sharing Lists and referenced Titles.
+   - Conflict resolution: last-modified wins per field.
+   - Notes remain owner-only unless explicitly shared.
+
+5. UI/UX:
+   - Add Title: search → pick → **required: assign to list** → optional note & liked/disliked.
+   - Library view: lists with titles; progress indicators for watched content.
+   - List sharing: tap share → select Apple ID → send invite → recipient accepts.
+   - Backup & Restore: JSON/ZIP export/import, merge or replace options.
+   - Simple, minimal, easy-to-use interface focused on tracking content.
+
+6. Offline Support:
+   - Read/write offline; sync automatically when online.
+
+7. Integrations:
+   - TMDb API for metadata and images.
+   - Optional: JustWatch API for streaming provider info.
+
+
+Do not include notifications, widgets, or monetization. Focus entirely on simplicity, privacy, reliable syncing, and sharing of lists between users.
