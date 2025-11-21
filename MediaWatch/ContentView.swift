@@ -214,9 +214,28 @@ enum HomeViewMode: String, CaseIterable {
     case list = "list"
 }
 
+enum HomeFilterMode: String, CaseIterable {
+    case all = "All"
+    case tvShow = "TV Show"
+    case film = "Film"
+
+    var displayName: String {
+        return rawValue
+    }
+
+    var icon: String {
+        switch self {
+        case .all: return "film.stack"
+        case .tvShow: return "tv"
+        case .film: return "film"
+        }
+    }
+}
+
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var viewMode: HomeViewMode = .carousel
+    @State private var filterMode: HomeFilterMode = .all
 
     // Fetch Current titles
     @FetchRequest(
@@ -259,62 +278,70 @@ struct HomeView: View {
     private var finishedTitles: FetchedResults<Title>
 
     var body: some View {
-        NavigationStack {
+        let filteredCurrent = filteredTitles(Array(currentTitles))
+        let filteredNew = filteredTitles(Array(newTitles))
+        let filteredPaused = filteredTitles(Array(pausedTitles))
+        let filteredMaybe = filteredTitles(Array(maybeTitles))
+        let filteredFinished = filteredTitles(Array(finishedTitles))
+
+        return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
                     // Current Section
-                    if !currentTitles.isEmpty {
+                    if !filteredCurrent.isEmpty {
                         statusSection(
                             status: .current,
-                            titles: Array(currentTitles)
+                            titles: filteredCurrent
                         )
                     }
 
                     // New Section
-                    if !newTitles.isEmpty {
+                    if !filteredNew.isEmpty {
                         statusSection(
                             status: .new,
-                            titles: Array(newTitles)
+                            titles: filteredNew
                         )
                     }
 
                     // Paused Section
-                    if !pausedTitles.isEmpty {
+                    if !filteredPaused.isEmpty {
                         statusSection(
                             status: .paused,
-                            titles: Array(pausedTitles)
+                            titles: filteredPaused
                         )
                     }
 
                     // Maybe Section
-                    if !maybeTitles.isEmpty {
+                    if !filteredMaybe.isEmpty {
                         statusSection(
                             status: .maybe,
-                            titles: Array(maybeTitles)
+                            titles: filteredMaybe
                         )
                     }
 
                     // Finished Section
-                    if !finishedTitles.isEmpty {
+                    if !filteredFinished.isEmpty {
                         statusSection(
                             status: .finished,
-                            titles: Array(finishedTitles)
+                            titles: filteredFinished
                         )
                     }
 
                     // Empty State
-                    if currentTitles.isEmpty && newTitles.isEmpty && pausedTitles.isEmpty && maybeTitles.isEmpty && finishedTitles.isEmpty {
+                    if filteredCurrent.isEmpty && filteredNew.isEmpty && filteredPaused.isEmpty && filteredMaybe.isEmpty && filteredFinished.isEmpty {
                         VStack(spacing: 16) {
-                            Image(systemName: "film.stack")
+                            Image(systemName: filterMode.icon)
                                 .font(.system(size: 60))
                                 .foregroundStyle(.secondary)
 
-                            Text("Your Dashboard")
+                            Text(filterMode == .all ? "Your Dashboard" : "No \(filterMode.displayName)s")
                                 .font(.title2)
                                 .fontWeight(.bold)
 
-                            Text("Start adding movies and TV shows to see your watching progress here.")
+                            Text(filterMode == .all
+                                ? "Start adding movies and TV shows to see your watching progress here."
+                                : "No \(filterMode.displayName.lowercased())s match the current filter.")
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -331,36 +358,66 @@ struct HomeView: View {
             .navigationTitle("Home")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            viewMode = .carousel
-                        } label: {
-                            Label("Carousel", systemImage: "rectangle.split.1x2")
-                            if viewMode == .carousel {
-                                Image(systemName: "checkmark")
+                    HStack(spacing: 16) {
+                        // Filter Menu
+                        Menu {
+                            ForEach(HomeFilterMode.allCases, id: \.self) { filter in
+                                Button {
+                                    filterMode = filter
+                                } label: {
+                                    Label(filter.displayName, systemImage: filter.icon)
+                                    if filterMode == filter {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
-                        }
-                        Button {
-                            viewMode = .grid
                         } label: {
-                            Label("Grid", systemImage: "square.grid.2x2")
-                            if viewMode == .grid {
-                                Image(systemName: "checkmark")
-                            }
+                            Image(systemName: filterMode == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                         }
-                        Button {
-                            viewMode = .list
+
+                        // View Mode Menu
+                        Menu {
+                            Button {
+                                viewMode = .carousel
+                            } label: {
+                                Label("Carousel", systemImage: "rectangle.split.1x2")
+                                if viewMode == .carousel {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                            Button {
+                                viewMode = .grid
+                            } label: {
+                                Label("Grid", systemImage: "square.grid.2x2")
+                                if viewMode == .grid {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                            Button {
+                                viewMode = .list
+                            } label: {
+                                Label("List", systemImage: "list.bullet")
+                                if viewMode == .list {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         } label: {
-                            Label("List", systemImage: "list.bullet")
-                            if viewMode == .list {
-                                Image(systemName: "checkmark")
-                            }
+                            Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
                         }
-                    } label: {
-                        Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
                     }
                 }
             }
+        }
+    }
+
+    private func filteredTitles(_ titles: [Title]) -> [Title] {
+        switch filterMode {
+        case .all:
+            return titles
+        case .tvShow:
+            return titles.filter { $0.mediaType == "tv" }
+        case .film:
+            return titles.filter { $0.mediaType == "movie" }
         }
     }
 
@@ -1677,6 +1734,10 @@ struct TitleListRow: View {
                 title.watched.toggle()
                 if title.watched {
                     title.watchedDate = Date()
+                    // Also set lastWatched for movies
+                    if title.mediaType == "movie" {
+                        title.lastWatched = Date()
+                    }
                 }
                 try? viewContext.save()
             } label: {
@@ -1920,38 +1981,40 @@ struct TitleDetailView: View {
 
     private var datesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Started date
-            HStack {
-                Text("Started")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if title.startDate != nil {
-                    DatePicker("", selection: Binding(
-                        get: { title.startDate ?? Date() },
-                        set: { newValue in
-                            title.startDate = newValue
+            // Started date - only show for TV shows, not movies
+            if title.mediaType != "movie" {
+                HStack {
+                    Text("Started")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if title.startDate != nil {
+                        DatePicker("", selection: Binding(
+                            get: { title.startDate ?? Date() },
+                            set: { newValue in
+                                title.startDate = newValue
+                                try? viewContext.save()
+                            }
+                        ), displayedComponents: .date)
+                        .labelsHidden()
+
+                        Button {
+                            title.startDate = nil
+                            try? viewContext.save()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button("Set") {
+                            title.startDate = Date()
                             try? viewContext.save()
                         }
-                    ), displayedComponents: .date)
-                    .labelsHidden()
-
-                    Button {
-                        title.startDate = nil
-                        try? viewContext.save()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                        .font(.subheadline)
                     }
-                    .buttonStyle(.plain)
-                } else {
-                    Button("Set") {
-                        title.startDate = Date()
-                        try? viewContext.save()
-                    }
-                    .font(.subheadline)
                 }
+                .font(.subheadline)
             }
-            .font(.subheadline)
 
             // Last Watched date
             HStack {
@@ -2476,6 +2539,7 @@ struct TitleDetailView: View {
                 title.watched.toggle()
                 if title.watched {
                     title.watchedDate = Date()
+                    title.lastWatched = Date()
                 }
                 try? viewContext.save()
             } label: {
@@ -4526,6 +4590,16 @@ struct ProfileView: View {
     @State private var showingRestoreConfirmation = false
     @State private var pendingRestoreData: Data?
 
+    // Activity Management state
+    @State private var showingClearAllHistoryAlert = false
+    @State private var showingKeep60DaysAlert = false
+    @State private var showingClearMostPopularAlert = false
+    @State private var showingClearEpisodeWatchedAlert = false
+    @State private var showingClearAddedShowsAlert = false
+
+    @FetchRequest(sortDescriptors: [])
+    private var allTitles: FetchedResults<Title>
+
     var body: some View {
         NavigationStack {
             List {
@@ -4570,6 +4644,47 @@ struct ProfileView: View {
                     } label: {
                         Label("Clear Cache", systemImage: "trash")
                     }
+                }
+
+                // Activity Management Section
+                Section {
+                    // History Management
+                    Button(role: .destructive) {
+                        showingClearAllHistoryAlert = true
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
+                    }
+
+                    Button(role: .destructive) {
+                        showingKeep60DaysAlert = true
+                    } label: {
+                        Label("Keep only last 60 days", systemImage: "calendar.badge.minus")
+                    }
+
+                    // Most Popular Management
+                    Button(role: .destructive) {
+                        showingClearMostPopularAlert = true
+                    } label: {
+                        Label("Clear Counts from Most Popular", systemImage: "chart.bar.xaxis")
+                    }
+
+                    // Episode Watched Count
+                    Button(role: .destructive) {
+                        showingClearEpisodeWatchedAlert = true
+                    } label: {
+                        Label("Clear Episode Watched Count", systemImage: "play.circle")
+                    }
+
+                    // Added Shows Count
+                    Button(role: .destructive) {
+                        showingClearAddedShowsAlert = true
+                    } label: {
+                        Label("Clear Added Shows Count", systemImage: "plus.circle")
+                    }
+                } header: {
+                    Text("Activity Management")
+                } footer: {
+                    Text("Manage your activity history and counts. These actions cannot be undone.")
                 }
 
                 // Backup & Restore Section
@@ -4748,6 +4863,47 @@ struct ProfileView: View {
             } message: {
                 Text("Your data has been successfully restored from the backup.")
             }
+            // Activity Management Alerts
+            .alert("Clear All History", isPresented: $showingClearAllHistoryAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    clearAllHistory()
+                }
+            } message: {
+                Text("This will clear activity tracking dates (added, modified, watched dates). Episodes will remain marked as watched and favorites will be preserved. This action cannot be undone.")
+            }
+            .alert("Keep Only Last 60 Days", isPresented: $showingKeep60DaysAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Keep 60 Days", role: .destructive) {
+                    keepOnly60Days()
+                }
+            } message: {
+                Text("This will remove activity tracking dates older than 60 days. Episodes will remain marked as watched and favorites will be preserved. This action cannot be undone.")
+            }
+            .alert("Clear Counts from Most Popular", isPresented: $showingClearMostPopularAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    clearMostPopularCounts()
+                }
+            } message: {
+                Text("This will clear episode watch dates, resetting the Most Popular tracking. Episodes will remain marked as watched. This action cannot be undone.")
+            }
+            .alert("Clear Episode Watched Count", isPresented: $showingClearEpisodeWatchedAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    clearEpisodeWatchedCount()
+                }
+            } message: {
+                Text("This will clear episode watch dates, resetting the Episodes Watched count. Episodes will remain marked as watched. This action cannot be undone.")
+            }
+            .alert("Clear Added Shows Count", isPresented: $showingClearAddedShowsAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    clearAddedShowsCount()
+                }
+            } message: {
+                Text("This will clear title added dates, resetting the Added Shows count. All other title data will be preserved. This action cannot be undone.")
+            }
         }
     }
 
@@ -4813,6 +4969,82 @@ struct ProfileView: View {
                 restoreError = "Failed to restore backup: \(error.localizedDescription)"
             }
         }
+    }
+
+    // MARK: - Activity Management Functions
+
+    private func clearAllHistory() {
+        // Clear all activity-related dates from titles
+        for title in allTitles {
+            title.dateAdded = nil
+            title.dateModified = nil
+            title.lastWatched = nil
+            title.watchedDate = nil
+
+            // Clear episode watched dates
+            if let episodes = title.episodes as? Set<Episode> {
+                for episode in episodes {
+                    episode.watchedDate = nil
+                }
+            }
+        }
+        try? viewContext.save()
+    }
+
+    private func keepOnly60Days() {
+        let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+
+        for title in allTitles {
+            // Clear dates older than 60 days
+            if let dateAdded = title.dateAdded, dateAdded < sixtyDaysAgo {
+                title.dateAdded = nil
+            }
+            if let dateModified = title.dateModified, dateModified < sixtyDaysAgo {
+                title.dateModified = nil
+            }
+            if let lastWatched = title.lastWatched, lastWatched < sixtyDaysAgo {
+                title.lastWatched = nil
+            }
+            if let watchedDate = title.watchedDate, watchedDate < sixtyDaysAgo {
+                title.watchedDate = nil
+            }
+
+            // Clear episode watched dates older than 60 days
+            if let episodes = title.episodes as? Set<Episode> {
+                for episode in episodes {
+                    if let watchedDate = episode.watchedDate, watchedDate < sixtyDaysAgo {
+                        episode.watchedDate = nil
+                    }
+                }
+            }
+        }
+        try? viewContext.save()
+    }
+
+    private func clearMostPopularCounts() {
+        // Clear all episode watchedDate values (same as the old Clear Counts)
+        let allEpisodes = allTitles.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
+        for episode in allEpisodes {
+            episode.watchedDate = nil
+        }
+        try? viewContext.save()
+    }
+
+    private func clearEpisodeWatchedCount() {
+        // Clear all episode watchedDate values
+        let allEpisodes = allTitles.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
+        for episode in allEpisodes {
+            episode.watchedDate = nil
+        }
+        try? viewContext.save()
+    }
+
+    private func clearAddedShowsCount() {
+        // Clear all title dateAdded values
+        for title in allTitles {
+            title.dateAdded = nil
+        }
+        try? viewContext.save()
     }
 }
 
@@ -4922,16 +5154,40 @@ struct ActivityView: View {
                     .padding(.vertical, 4)
                 }
 
-                // Top Show Genres Section
-                Section("Top Show Genres") {
-                    let allGenres = allTitles.flatMap { ($0.genres as? [String]) ?? [] }
-                    let genreCounts = Dictionary(grouping: allGenres) { $0 }
+                // Top TV Show Genres Section
+                Section("Top TV Show Genres") {
+                    let tvShowGenres = tvShows.flatMap { ($0.genres as? [String]) ?? [] }
+                    let genreCounts = Dictionary(grouping: tvShowGenres) { $0 }
                         .mapValues { $0.count }
                         .sorted { $0.value > $1.value }
                         .prefix(10)
 
                     if genreCounts.isEmpty {
-                        Text("No genres available")
+                        Text("No TV show genres available")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        ForEach(Array(genreCounts), id: \.key) { genre, count in
+                            HStack {
+                                Text(genre)
+                                Spacer()
+                                Text("\(count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // Top Movie Genres Section
+                Section("Top Movie Genres") {
+                    let movieGenres = movies.flatMap { ($0.genres as? [String]) ?? [] }
+                    let genreCounts = Dictionary(grouping: movieGenres) { $0 }
+                        .mapValues { $0.count }
+                        .sorted { $0.value > $1.value }
+                        .prefix(10)
+
+                    if genreCounts.isEmpty {
+                        Text("No movie genres available")
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
@@ -5033,11 +5289,8 @@ struct ActivityView: View {
 // MARK: - Most Popular Section
 
 struct MostPopularSection: View {
-    @Environment(\.managedObjectContext) private var viewContext
     @FetchRequest(sortDescriptors: [])
     private var allTitles: FetchedResults<Title>
-
-    @State private var showClearAlert = false
 
     var body: some View {
         Section {
@@ -5084,11 +5337,6 @@ struct MostPopularSection: View {
                         }
                     }
                 }
-
-                Button("Clear Counts") {
-                    showClearAlert = true
-                }
-                .foregroundStyle(.red)
             }
         } header: {
             VStack(alignment: .leading, spacing: 2) {
@@ -5099,22 +5347,6 @@ struct MostPopularSection: View {
                     .textCase(.none)
             }
         }
-        .alert("Clear Counts", isPresented: $showClearAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear", role: .destructive) {
-                clearCounts()
-            }
-        } message: {
-            Text("This will clear the watch dates for all episodes, resetting the activity tracking. This action cannot be undone.")
-        }
-    }
-
-    private func clearCounts() {
-        let allEpisodes = allTitles.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
-        for episode in allEpisodes {
-            episode.watchedDate = nil
-        }
-        try? viewContext.save()
     }
 }
 
