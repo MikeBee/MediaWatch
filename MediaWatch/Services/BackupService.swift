@@ -21,9 +21,58 @@ class AppSettings: ObservableObject {
         }
     }
 
+    // Home View Settings
+    @Published var homeViewMode: String {
+        didSet {
+            UserDefaults.standard.set(homeViewMode, forKey: "homeViewMode")
+        }
+    }
+
+    @Published var homeFilterMode: String {
+        didSet {
+            UserDefaults.standard.set(homeFilterMode, forKey: "homeFilterMode")
+        }
+    }
+
+    // Lists View Settings
+    @Published var listsViewMode: String {
+        didSet {
+            UserDefaults.standard.set(listsViewMode, forKey: "listsViewMode")
+        }
+    }
+
+    @Published var listsFilterMode: String {
+        didSet {
+            UserDefaults.standard.set(listsFilterMode, forKey: "listsFilterMode")
+        }
+    }
+
+    @Published var listsSortMode: String {
+        didSet {
+            UserDefaults.standard.set(listsSortMode, forKey: "listsSortMode")
+        }
+    }
+
+    @Published var listsSortAscending: Bool {
+        didSet {
+            UserDefaults.standard.set(listsSortAscending, forKey: "listsSortAscending")
+        }
+    }
+
     init() {
+        // Theme
         let savedTheme = UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue
         self.theme = AppTheme(rawValue: savedTheme) ?? .system
+
+        // Home View Settings
+        self.homeViewMode = UserDefaults.standard.string(forKey: "homeViewMode") ?? "carousel"
+        self.homeFilterMode = UserDefaults.standard.string(forKey: "homeFilterMode") ?? "All"
+
+        // Lists View Settings
+        self.listsViewMode = UserDefaults.standard.string(forKey: "listsViewMode") ?? "Grid"
+        self.listsFilterMode = UserDefaults.standard.string(forKey: "listsFilterMode") ?? "All"
+        self.listsSortMode = UserDefaults.standard.string(forKey: "listsSortMode") ?? "Manual"
+        self.listsSortAscending = UserDefaults.standard.object(forKey: "listsSortAscending") as? Bool ?? true
     }
 }
 
