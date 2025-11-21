@@ -1250,6 +1250,7 @@ struct ListDetailView: View {
     @State private var sortAscending = false
     @State private var groupOption: ListGroupOption = .none
     @State private var selectedWatchFilters: Set<Int16> = []
+    @State private var selectedMediaTypeFilters: Set<String> = []
     @State private var showFilterSheet = false
     @State private var showSortMenu = false
     @State private var showGroupMenu = false
@@ -1267,9 +1268,14 @@ struct ListDetailView: View {
     private var processedTitles: [Title] {
         var titles = list.sortedTitles
 
-        // Apply filters
+        // Apply filters - exclude checked items
         if !selectedWatchFilters.isEmpty {
-            titles = titles.filter { selectedWatchFilters.contains($0.watchStatus) }
+            titles = titles.filter { !selectedWatchFilters.contains($0.watchStatus) }
+        }
+
+        // Apply media type filters - exclude checked items
+        if !selectedMediaTypeFilters.isEmpty {
+            titles = titles.filter { !selectedMediaTypeFilters.contains($0.mediaType ?? "") }
         }
 
         // Apply sorting
@@ -1325,7 +1331,7 @@ struct ListDetailView: View {
 
     // Active filter count
     private var activeFilterCount: Int {
-        selectedWatchFilters.count
+        selectedWatchFilters.count + selectedMediaTypeFilters.count
     }
 
     var body: some View {
@@ -1344,6 +1350,7 @@ struct ListDetailView: View {
                 } actions: {
                     Button("Clear Filters") {
                         selectedWatchFilters.removeAll()
+                        selectedMediaTypeFilters.removeAll()
                     }
                 }
             } else {
@@ -1525,7 +1532,8 @@ struct ListDetailView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             FilterSheetView(
-                selectedWatchFilters: $selectedWatchFilters
+                selectedWatchFilters: $selectedWatchFilters,
+                selectedMediaTypeFilters: $selectedMediaTypeFilters
             )
         }
         .alert("Rename List", isPresented: $showRenameAlert) {
@@ -1589,10 +1597,21 @@ struct ListDetailView: View {
 struct FilterSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedWatchFilters: Set<Int16>
+    @Binding var selectedMediaTypeFilters: Set<String>
 
     var body: some View {
         NavigationStack {
             List {
+                // Media Type Filters
+                Section {
+                    MediaTypeFilterRow(mediaType: "movie", label: "Movies", icon: "film", selectedFilters: $selectedMediaTypeFilters)
+                    MediaTypeFilterRow(mediaType: "tv", label: "TV Shows", icon: "tv", selectedFilters: $selectedMediaTypeFilters)
+                } header: {
+                    Text("Media Type")
+                } footer: {
+                    Text("Checked items will be hidden from the list")
+                }
+
                 // Watch Status Filters
                 Section("Watch Status") {
                     ForEach(WatchStatus.allCases, id: \.rawValue) { status in
@@ -1606,8 +1625,9 @@ struct FilterSheetView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Clear All") {
                         selectedWatchFilters.removeAll()
+                        selectedMediaTypeFilters.removeAll()
                     }
-                    .disabled(selectedWatchFilters.isEmpty)
+                    .disabled(selectedWatchFilters.isEmpty && selectedMediaTypeFilters.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
@@ -1617,6 +1637,35 @@ struct FilterSheetView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+struct MediaTypeFilterRow: View {
+    let mediaType: String
+    let label: String
+    let icon: String
+    @Binding var selectedFilters: Set<String>
+
+    var body: some View {
+        Button {
+            if selectedFilters.contains(mediaType) {
+                selectedFilters.remove(mediaType)
+            } else {
+                selectedFilters.insert(mediaType)
+            }
+        } label: {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(.blue)
+                Text(label)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if selectedFilters.contains(mediaType) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+        }
     }
 }
 
@@ -2010,6 +2059,23 @@ struct TitleDetailView: View {
 
     private var datesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Next Episode - only show for TV shows
+            if title.mediaType != "movie" {
+                HStack {
+                    Text("Next Episode")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let next = title.nextUnwatchedEpisode {
+                        Text("S\(next.season) E\(next.episode)")
+                            .fontWeight(.medium)
+                    } else {
+                        Text("All watched")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.subheadline)
+            }
+
             // Started date - only show for TV shows, not movies
             if title.mediaType != "movie" {
                 HStack {
