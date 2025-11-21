@@ -2066,8 +2066,9 @@ struct TitleDetailView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let next = title.nextUnwatchedEpisode {
-                        Text("S\(next.season) E\(next.episode)")
-                            .fontWeight(.medium)
+                        Text("Season \(next.season) Episode \(next.episode)")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(colorScheme == .dark ? .yellow : .blue)
                     } else {
                         Text("All watched")
                             .foregroundStyle(.secondary)
