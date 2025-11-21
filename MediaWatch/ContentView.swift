@@ -4596,7 +4596,6 @@ struct ProfileView: View {
     @State private var showingClearMostPopularAlert = false
     @State private var showingClearEpisodeWatchedAlert = false
     @State private var showingClearAddedShowsAlert = false
-    @State private var showingClearFavoritedEpisodesAlert = false
 
     @FetchRequest(sortDescriptors: [])
     private var allTitles: FetchedResults<Title>
@@ -4681,13 +4680,6 @@ struct ProfileView: View {
                         showingClearAddedShowsAlert = true
                     } label: {
                         Label("Clear Added Shows Count", systemImage: "plus.circle")
-                    }
-
-                    // Favorited Episodes Count
-                    Button(role: .destructive) {
-                        showingClearFavoritedEpisodesAlert = true
-                    } label: {
-                        Label("Clear Favorited Episodes Count", systemImage: "star")
                     }
                 } header: {
                     Text("Activity Management")
@@ -4878,7 +4870,7 @@ struct ProfileView: View {
                     clearAllHistory()
                 }
             } message: {
-                Text("This will clear all activity history data including watched dates, added dates, and modified dates. This action cannot be undone.")
+                Text("This will clear activity tracking dates (added, modified, watched dates). Episodes will remain marked as watched and favorites will be preserved. This action cannot be undone.")
             }
             .alert("Keep Only Last 60 Days", isPresented: $showingKeep60DaysAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -4886,7 +4878,7 @@ struct ProfileView: View {
                     keepOnly60Days()
                 }
             } message: {
-                Text("This will remove all activity history older than 60 days. This action cannot be undone.")
+                Text("This will remove activity tracking dates older than 60 days. Episodes will remain marked as watched and favorites will be preserved. This action cannot be undone.")
             }
             .alert("Clear Counts from Most Popular", isPresented: $showingClearMostPopularAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -4894,7 +4886,7 @@ struct ProfileView: View {
                     clearMostPopularCounts()
                 }
             } message: {
-                Text("This will clear the watch dates for all episodes, resetting the Most Popular activity tracking. This action cannot be undone.")
+                Text("This will clear episode watch dates, resetting the Most Popular tracking. Episodes will remain marked as watched. This action cannot be undone.")
             }
             .alert("Clear Episode Watched Count", isPresented: $showingClearEpisodeWatchedAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -4902,7 +4894,7 @@ struct ProfileView: View {
                     clearEpisodeWatchedCount()
                 }
             } message: {
-                Text("This will clear all episode watched dates, resetting the Episodes Watched count. This action cannot be undone.")
+                Text("This will clear episode watch dates, resetting the Episodes Watched count. Episodes will remain marked as watched. This action cannot be undone.")
             }
             .alert("Clear Added Shows Count", isPresented: $showingClearAddedShowsAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -4910,15 +4902,7 @@ struct ProfileView: View {
                     clearAddedShowsCount()
                 }
             } message: {
-                Text("This will clear all title added dates, resetting the Added Shows count. This action cannot be undone.")
-            }
-            .alert("Clear Favorited Episodes Count", isPresented: $showingClearFavoritedEpisodesAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Clear", role: .destructive) {
-                    clearFavoritedEpisodesCount()
-                }
-            } message: {
-                Text("This will clear the favorited status from all episodes, but will NOT affect the 'Show with most favorites' count. This action cannot be undone.")
+                Text("This will clear title added dates, resetting the Added Shows count. All other title data will be preserved. This action cannot be undone.")
             }
         }
     }
@@ -5059,32 +5043,6 @@ struct ProfileView: View {
         // Clear all title dateAdded values
         for title in allTitles {
             title.dateAdded = nil
-        }
-        try? viewContext.save()
-    }
-
-    private func clearFavoritedEpisodesCount() {
-        // Clear isStarred status from all episodes, but NOT the "Show with most favorites" count
-        // The "Show with most favorites" is calculated based on isStarred, so we need to clear
-        // just the count display, not the actual isStarred values
-        // Actually, re-reading the requirement: "Clear Favorited Episodes Count" should clear
-        // the favorited episodes count but NOT the "Show with most favorites" count
-        // This means we should clear the isStarred status from episodes to reset the count
-        // But keep the "Show with most favorites" intact - this seems contradictory
-        // Let me re-interpret: clear the total favorited count by clearing isStarred,
-        // but the "Show with most favorites" is a separate calculation that shows which show
-        // has the most starred episodes - if we clear isStarred, both would be affected.
-        //
-        // The only way to clear the count but keep "Show with most favorites" is to NOT clear
-        // isStarred at all. But that doesn't make sense either.
-        //
-        // I'll interpret this as: this button does nothing meaningful since both are derived
-        // from the same data. Or perhaps the user wants to keep track of which show had the
-        // most favorites historically. Since we can't do that without a separate field,
-        // I'll implement it as clearing isStarred from episodes.
-        let allEpisodes = allTitles.flatMap { (($0.episodes as? Set<Episode>) ?? []) }
-        for episode in allEpisodes {
-            episode.isStarred = false
         }
         try? viewContext.save()
     }
