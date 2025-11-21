@@ -234,8 +234,15 @@ enum HomeFilterMode: String, CaseIterable {
 
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var viewMode: HomeViewMode = .carousel
-    @State private var filterMode: HomeFilterMode = .all
+    @StateObject private var appSettings = AppSettings.shared
+
+    private var viewMode: HomeViewMode {
+        HomeViewMode(rawValue: appSettings.homeViewMode) ?? .carousel
+    }
+
+    private var filterMode: HomeFilterMode {
+        HomeFilterMode(rawValue: appSettings.homeFilterMode) ?? .all
+    }
 
     // Fetch Current titles
     @FetchRequest(
@@ -363,7 +370,7 @@ struct HomeView: View {
                         Menu {
                             ForEach(HomeFilterMode.allCases, id: \.self) { filter in
                                 Button {
-                                    filterMode = filter
+                                    appSettings.homeFilterMode = filter.rawValue
                                 } label: {
                                     Label(filter.displayName, systemImage: filter.icon)
                                     if filterMode == filter {
@@ -378,7 +385,7 @@ struct HomeView: View {
                         // View Mode Menu
                         Menu {
                             Button {
-                                viewMode = .carousel
+                                appSettings.homeViewMode = HomeViewMode.carousel.rawValue
                             } label: {
                                 Label("Carousel", systemImage: "rectangle.split.1x2")
                                 if viewMode == .carousel {
@@ -386,7 +393,7 @@ struct HomeView: View {
                                 }
                             }
                             Button {
-                                viewMode = .grid
+                                appSettings.homeViewMode = HomeViewMode.grid.rawValue
                             } label: {
                                 Label("Grid", systemImage: "square.grid.2x2")
                                 if viewMode == .grid {
@@ -394,7 +401,7 @@ struct HomeView: View {
                                 }
                             }
                             Button {
-                                viewMode = .list
+                                appSettings.homeViewMode = HomeViewMode.list.rawValue
                             } label: {
                                 Label("List", systemImage: "list.bullet")
                                 if viewMode == .list {
@@ -654,6 +661,7 @@ enum ListViewMode: String, CaseIterable {
 
 struct ListsView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var appSettings = AppSettings.shared
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
@@ -665,11 +673,23 @@ struct ListsView: View {
     @State private var newListName = ""
     @State private var newListIcon = "list.bullet"
     @State private var newListColor = "007AFF"
-    @State private var sortMode: ListSortMode = .manual
-    @State private var isAscending = true
-    @State private var filterMode: ListFilterMode = .all
-    @State private var viewMode: ListViewMode = .grid
     @State private var editMode: EditMode = .inactive
+
+    private var sortMode: ListSortMode {
+        ListSortMode(rawValue: appSettings.listsSortMode) ?? .manual
+    }
+
+    private var isAscending: Bool {
+        appSettings.listsSortAscending
+    }
+
+    private var filterMode: ListFilterMode {
+        ListFilterMode(rawValue: appSettings.listsFilterMode) ?? .all
+    }
+
+    private var viewMode: ListViewMode {
+        ListViewMode(rawValue: appSettings.listsViewMode) ?? .grid
+    }
 
     private var filteredAndSortedLists: [MediaList] {
         var results = Array(allLists)
@@ -828,7 +848,10 @@ struct ListsView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     // Sort menu
                     Menu {
-                        Picker("Sort", selection: $sortMode) {
+                        Picker("Sort", selection: Binding(
+                            get: { sortMode },
+                            set: { appSettings.listsSortMode = $0.rawValue }
+                        )) {
                             ForEach(ListSortMode.allCases, id: \.self) { mode in
                                 Text(mode.rawValue)
                                     .tag(mode)
@@ -838,7 +861,7 @@ struct ListsView: View {
                         Divider()
 
                         Button {
-                            isAscending.toggle()
+                            appSettings.listsSortAscending.toggle()
                         } label: {
                             Label(
                                 isAscending ? "Ascending" : "Descending",
@@ -851,7 +874,10 @@ struct ListsView: View {
 
                     // Filter menu
                     Menu {
-                        Picker("Filter", selection: $filterMode) {
+                        Picker("Filter", selection: Binding(
+                            get: { filterMode },
+                            set: { appSettings.listsFilterMode = $0.rawValue }
+                        )) {
                             ForEach(ListFilterMode.allCases, id: \.self) { mode in
                                 Text(mode.displayName)
                                     .tag(mode)
@@ -863,7 +889,10 @@ struct ListsView: View {
 
                     // View Mode menu
                     Menu {
-                        Picker("View", selection: $viewMode) {
+                        Picker("View", selection: Binding(
+                            get: { viewMode },
+                            set: { appSettings.listsViewMode = $0.rawValue }
+                        )) {
                             ForEach(ListViewMode.allCases, id: \.self) { mode in
                                 Text(mode.rawValue)
                                     .tag(mode)
