@@ -138,6 +138,44 @@ enum WatchStatus: Int16, CaseIterable {
     }
 }
 
+// MARK: - Local Cast Data Storage
+// Stores cast data in UserDefaults to avoid CloudKit schema issues
+// (CloudKit production schemas are immutable and cannot add new fields)
+
+class LocalCastStorage {
+    static let shared = LocalCastStorage()
+    private let storageKey = "localCastData"
+
+    private var cache: [Int64: [CastMember]] = [:]
+
+    private init() {
+        loadFromDisk()
+    }
+
+    private func loadFromDisk() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let decoded = try? JSONDecoder().decode([Int64: [CastMember]].self, from: data) else {
+            return
+        }
+        cache = decoded
+    }
+
+    private func saveToDisk() {
+        if let encoded = try? JSONEncoder().encode(cache) {
+            UserDefaults.standard.set(encoded, forKey: storageKey)
+        }
+    }
+
+    func getCast(for tmdbId: Int64) -> [CastMember] {
+        return cache[tmdbId] ?? []
+    }
+
+    func setCast(_ members: [CastMember], for tmdbId: Int64) {
+        cache[tmdbId] = members
+        saveToDisk()
+    }
+}
+
 // MARK: - Title Extension for Next Episode
 
 extension Title {
@@ -181,23 +219,14 @@ extension Title {
         return StreamingService(rawValue: serviceName) ?? .other
     }
 
-    /// Get cast members from stored data
+    /// Get cast members from local storage (not CloudKit synced)
     var castMembers: [CastMember] {
-        guard let data = castData else { return [] }
-        do {
-            return try JSONDecoder().decode([CastMember].self, from: data)
-        } catch {
-            return []
-        }
+        return LocalCastStorage.shared.getCast(for: tmdbId)
     }
 
-    /// Set cast members to stored data
+    /// Set cast members to local storage (not CloudKit synced)
     func setCast(_ members: [CastMember]) {
-        do {
-            castData = try JSONEncoder().encode(members)
-        } catch {
-            castData = nil
-        }
+        LocalCastStorage.shared.setCast(members, for: tmdbId)
     }
 
     /// Get cast names for searching
