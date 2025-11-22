@@ -38,7 +38,7 @@ struct ContentView: View {
                     ProgressView()
                         .scaleEffect(2)
                         .tint(.white)
-                    Text("Loading MediaWatch...")
+                    Text("Loading MediaShows...")
                         .font(.headline)
                         .foregroundStyle(.white)
                 }
@@ -569,7 +569,7 @@ struct ContinueWatchingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomLeading) {
+            ZStack(alignment: .topLeading) {
                 PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
                     .frame(width: 120, height: 180)
                     .cornerRadius(8)
@@ -2005,7 +2005,7 @@ struct TitleDetailView: View {
             }
 
             // Title Info
-            HStack(alignment: .bottom, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 // Poster
                 PosterImageView(posterPath: title.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
                     .frame(width: 100, height: 150)
@@ -4147,7 +4147,7 @@ struct SearchResultDetailView: View {
             }
 
             // Title Info
-            HStack(alignment: .bottom, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 // Poster
                 PosterImageView(posterPath: result.posterPath, size: Constants.TMDb.ImageSize.posterMedium)
                     .frame(width: 100, height: 150)
@@ -4418,7 +4418,7 @@ struct UserManualView: View {
             // Getting Started
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("MediaWatch helps you track movies and TV shows you're watching. Search for titles, organize them in lists, track your progress, and rate what you've watched.")
+                    Text("MediaShows helps you track movies and TV shows you're watching. Search for titles, organize them in lists, track your progress, and rate what you've watched.")
                         .font(.subheadline)
                 }
             } header: {

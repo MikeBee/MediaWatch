@@ -24,7 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		27BABDB42ECE311E000CA211 /* MediaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		27BABDB42ECE311E000CA211 /* MediaShows.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaShows.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27BABDC82ECE3129000CA211 /* MediaWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		27BABDD22ECE3129000CA211 /* MediaWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -98,7 +98,7 @@
 		27BABDB52ECE311E000CA211 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				27BABDB42ECE311E000CA211 /* MediaWatch.app */,
+				27BABDB42ECE311E000CA211 /* MediaShows.app */,
 				27BABDC82ECE3129000CA211 /* MediaWatchTests.xctest */,
 				27BABDD22ECE3129000CA211 /* MediaWatchUITests.xctest */,
 			);
@@ -127,7 +127,7 @@
 			packageProductDependencies = (
 			);
 			productName = MediaWatch;
-			productReference = 27BABDB42ECE311E000CA211 /* MediaWatch.app */;
+			productReference = 27BABDB42ECE311E000CA211 /* MediaShows.app */;
 			productType = "com.apple.product-type.application";
 		};
 		27BABDC72ECE3129000CA211 /* MediaWatchTests */ = {

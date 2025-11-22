@@ -95,7 +95,7 @@ final class PersistenceController: ObservableObject {
 
         do {
             try context.save()
-            print("Saved line 98 to Core Data / CloudKit")
+            // print("Saved line 98 to Core Data / CloudKit")
         } catch {
             let nsError = error as NSError
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
@@ -133,9 +133,9 @@ final class PersistenceController: ObservableObject {
 
         // Configure store descriptions for history tracking
         container.persistentStoreDescriptions.forEach { description in
-            print("Final store description: \(description.url?.lastPathComponent ?? "nil")") //meb
-            print("CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
-            print("Database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
+            // print("Final store description: \(description.url?.lastPathComponent ?? "nil")") //meb
+             // print("CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+            // print("Database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
         }
@@ -146,9 +146,9 @@ final class PersistenceController: ObservableObject {
                 fatalError("Failed to load persistent store: \(error), \(error.userInfo)")
             }
 
-            print("Loaded store URL: \(description.url?.absoluteString ?? "nil")")  //meb
-            print("Loaded CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
-            print("Loaded database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)") //meb
+            // print("Loaded store URL: \(description.url?.absoluteString ?? "nil")")  //meb
+            // print("Loaded CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+            // print("Loaded database scope: \(description.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)") //meb
 
             
             // Track which store is which
@@ -188,8 +188,8 @@ final class PersistenceController: ObservableObject {
             containerIdentifier: cloudKitContainerIdentifier
         )
 
-        print("Private store URL: \(description.url?.absoluteString ?? "nil")") //meb
-        print("Private CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+        // print("Private store URL: \(description.url?.absoluteString ?? "nil")") //meb
+        // print("Private CloudKit container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
 
         
         // Configure shared store
@@ -203,9 +203,9 @@ final class PersistenceController: ObservableObject {
         )
         sharedDescription.cloudKitContainerOptions?.databaseScope = .shared
         
-        print("Shared store URL: \(sharedDescription.url?.absoluteString ?? "nil")")  //meb
-        print("Shared CloudKit container: \(sharedDescription.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
-        print("Shared database scope: \(sharedDescription.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
+        // print("Shared store URL: \(sharedDescription.url?.absoluteString ?? "nil")")  //meb
+        // print("Shared CloudKit container: \(sharedDescription.cloudKitContainerOptions?.containerIdentifier ?? "nil")") //meb
+        // print("Shared database scope: \(sharedDescription.cloudKitContainerOptions?.databaseScope.rawValue ?? -1)")  //meb
         
 
         // Enable history tracking for shared store
@@ -234,7 +234,7 @@ final class PersistenceController: ObservableObject {
 
         do {
             try context.save()
-            print("Saved movie to Core Data / CloudKit")
+            // print("Saved movie to Core Data / CloudKit")
             return true
         } catch {
             let nsError = error as NSError
@@ -247,7 +247,7 @@ final class PersistenceController: ObservableObject {
     func save(context: NSManagedObjectContext) throws {
         guard context.hasChanges else { return }
         try context.save()
-        print("Saved content line 232  to Core Data / CloudKit")
+        // print("Saved content line 232  to Core Data / CloudKit")
     }
 
     // MARK: - Sharing

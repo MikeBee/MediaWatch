@@ -12,7 +12,7 @@ enum Constants {
     // MARK: - App Info
 
     enum App {
-        static let name = "MediaWatch"
+        static let name = "MediaShows"
         static let bundleIdentifier = "com.mediashows.app"
     }
 
