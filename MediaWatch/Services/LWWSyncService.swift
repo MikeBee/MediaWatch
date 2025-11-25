@@ -369,7 +369,7 @@ final class LWWSyncService: NSObject, ObservableObject {
         // Fetch existing lists and create lookup by ID
         let fetchRequest = MediaList.fetchAll()
         let existingLists = try context.fetch(fetchRequest)
-        let existingListsById = Dictionary(uniqueKeysWithValues: existingLists.compactMap { list in
+        let existingListsById: [UUID: MediaList] = Dictionary(uniqueKeysWithValues: existingLists.compactMap { list in
             guard let id = list.id else { return nil }
             return (id, list)
         })
