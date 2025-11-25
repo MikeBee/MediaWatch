@@ -136,7 +136,7 @@ final class PersistenceController: ObservableObject {
     init(inMemory: Bool = false) {
         // MARK: - IMMEDIATE LWW RESET - BEFORE ANYTHING ELSE
         if !inMemory {
-            let currentVersion = "1.56"
+            let currentVersion = "1.58.14"
             let storedVersion = UserDefaults.standard.string(forKey: "app_version")
             let forceReset = storedVersion != currentVersion
             
@@ -167,19 +167,32 @@ final class PersistenceController: ObservableObject {
                     print("⚠️ Could not list store directory: \(error)")
                 }
                 
-                // Also clear CloudKit cache
-                UserDefaults.standard.removeObject(forKey: "NSCloudKitMirroringDelegateLastHistoryTokenKey")
-                UserDefaults.standard.removeObject(forKey: "PersistentCloudKitContainer.event.setupStarted")
-                UserDefaults.standard.removeObject(forKey: "PersistentCloudKitContainer.event.setupFinished")
+                // Clear ALL CloudKit sync tokens and cache
+                let cloudKitKeys = [
+                    "NSCloudKitMirroringDelegateLastHistoryTokenKey",
+                    "PersistentCloudKitContainer.event.setupStarted",
+                    "PersistentCloudKitContainer.event.setupFinished", 
+                    "com.apple.coredata.cloudkit.zone.ownerName",
+                    "NSCloudKitMirroringDelegate.setup",
+                    "NSCloudKitMirroringDelegate.lastOperationUUID",
+                    "NSCloudKitMirroringDelegate.accountDidChange",
+                    "NSCloudKitMirroringDelegate.lastKnownServerChangeToken",
+                    "com.apple.coredata.cloudkit.lastKnownRequestDate",
+                    "com.apple.coredata.cloudkit.shareMetadataCache"
+                ]
                 
-                // Also clear any Core Data UserDefaults that might cause issues
+                for key in cloudKitKeys {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+                
+                // Clear all LWW migration flags to force clean start
                 UserDefaults.standard.removeObject(forKey: "lww_migration_completed")
                 UserDefaults.standard.removeObject(forKey: "lww_migration_date")
-                UserDefaults.standard.synchronize()
+                UserDefaults.standard.removeObject(forKey: "needs_lww_migration")
                 
-                // Force CloudKit to reset by clearing container identifier cache
-                UserDefaults.standard.removeObject(forKey: "com.apple.coredata.cloudkit.zone.ownerName")
-                UserDefaults.standard.removeObject(forKey: "NSCloudKitMirroringDelegate.setup")
+                // Clear CloudKit container-specific caches that might have expired tokens
+                UserDefaults.standard.removeObject(forKey: "iCloud.reasonality.MediaShows.lastServerChangeToken")
+                UserDefaults.standard.removeObject(forKey: "com.apple.cloudkit.zone.tokens")
                 UserDefaults.standard.synchronize()
                 
                 UserDefaults.standard.set(currentVersion, forKey: "app_version")
