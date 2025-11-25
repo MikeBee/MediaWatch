@@ -24,7 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		27BABDB42ECE311E000CA211 /* MediaShows.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaShows.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		27BABDB42ECE311E000CA211 /* MediaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27BABDC82ECE3129000CA211 /* MediaWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		27BABDD22ECE3129000CA211 /* MediaWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -98,7 +98,7 @@
 		27BABDB52ECE311E000CA211 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				27BABDB42ECE311E000CA211 /* MediaShows.app */,
+				27BABDB42ECE311E000CA211 /* MediaWatch.app */,
 				27BABDC82ECE3129000CA211 /* MediaWatchTests.xctest */,
 				27BABDD22ECE3129000CA211 /* MediaWatchUITests.xctest */,
 			);
@@ -112,6 +112,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 27BABDDB2ECE3129000CA211 /* Build configuration list for PBXNativeTarget "MediaWatch" */;
 			buildPhases = (
+				27BABDFF2ECE4000000CA211 /* Increment Version */,
 				27BABDB02ECE311E000CA211 /* Sources */,
 				27BABDB12ECE311E000CA211 /* Frameworks */,
 				27BABDB22ECE311E000CA211 /* Resources */,
@@ -127,7 +128,7 @@
 			packageProductDependencies = (
 			);
 			productName = MediaWatch;
-			productReference = 27BABDB42ECE311E000CA211 /* MediaShows.app */;
+			productReference = 27BABDB42ECE311E000CA211 /* MediaWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 		27BABDC72ECE3129000CA211 /* MediaWatchTests */ = {
@@ -244,6 +245,27 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		27BABDFF2ECE4000000CA211 /* Increment Version */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Increment Version";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# Auto-increment build number\nPROJECT_FILE=\"$PROJECT_DIR/MediaWatch.xcodeproj/project.pbxproj\"\nCURRENT_BUILD=$(grep -m 1 \"CURRENT_PROJECT_VERSION = \" \"$PROJECT_FILE\" | sed 's/.*= \\([0-9]*\\);.*/\\1/')\nNEW_BUILD=$((CURRENT_BUILD + 1))\n\nsed -i '' \"s/CURRENT_PROJECT_VERSION = $CURRENT_BUILD;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g\" \"$PROJECT_FILE\"\necho \"🔨 Build: $CURRENT_BUILD → $NEW_BUILD\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		27BABDB02ECE311E000CA211 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -289,7 +311,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MediaWatch/MediaWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -301,11 +323,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaShows;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -321,7 +344,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MediaWatch/MediaWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -333,11 +356,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaShows;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -472,11 +496,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaWatchTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -491,11 +515,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaWatchTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -509,10 +533,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaWatchUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -526,10 +550,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = HH237576AZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.58.12;
 				PRODUCT_BUNDLE_IDENTIFIER = reasonality.MediaWatchUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
