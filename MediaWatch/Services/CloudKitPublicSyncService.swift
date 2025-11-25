@@ -1338,71 +1338,79 @@ final class CloudKitPublicSyncService: NSObject, ObservableObject {
     
     private func applyJSONToCoreData(_ syncData: SyncJSONData, context: NSManagedObjectContext) async throws {
         try await context.perform {
-            // Clear existing data and rebuild from JSON
-            try self.clearAllData(context: context)
-            
             Task { @MainActor in
-                self.logDiagnostic("🔄 Applying \(syncData.lists.count) lists to Core Data")
+                self.logDiagnostic("🔄 Applying \(syncData.lists.count) lists to Core Data (update-in-place)")
             }
             
-            let nonDeletedLists = syncData.lists.filter({ $0.deletedAt == nil }).sorted { $0.order < $1.order }
+            // Fetch existing lists and create lookup by ID
+            let fetchRequest = MediaList.fetchAll()
+            let existingLists = try context.fetch(fetchRequest)
+            let existingListsById: [UUID: MediaList] = Dictionary(uniqueKeysWithValues: existingLists.compactMap { list in
+                guard let id = list.id else { return nil }
+                return (id, list)
+            })
             
-            for (index, listData) in nonDeletedLists.enumerated() {
-                Task { @MainActor in
-                    self.logDiagnostic("📝 Creating list: '\(listData.name)' with \(listData.items.count) items (order: \(index))")
-                }
-                let list = MediaList(context: context)
-                list.id = UUID(uuidString: listData.id) ?? UUID()
-                list.name = listData.name
-                list.dateCreated = listData.createdAt
-                list.updatedAt = listData.updatedAt
-                list.deviceID = listData.deviceID
-                list.order = Double(index)
-                list.isDefault = index == 0
-                list.isShared = false
-                list.icon = "list.bullet"
+            var processedListIds: Set<UUID> = []
+            
+            // Update or create lists from sync data
+            for listData in syncData.lists {
+                guard let listUUID = UUID(uuidString: listData.id) else { continue }
+                processedListIds.insert(listUUID)
                 
-                for (index, itemData) in listData.items.filter({ $0.deletedAt == nil }).enumerated() {
-                    let title = Title(context: context)
-                    title.id = UUID(uuidString: itemData.id) ?? UUID()
-                    title.tmdbId = Int64(itemData.tmdbId)
-                    title.mediaType = itemData.mediaType
-                    title.title = itemData.title
-                    title.year = Int16(itemData.year)
-                    title.overview = itemData.overview
-                    title.posterPath = itemData.posterPath
-                    title.runtime = Int16(itemData.runtime)
-                    title.watched = itemData.watched
-                    title.watchedDate = itemData.watchedDate
-                    title.userRating = itemData.userRating ?? 0
-                    title.createdAt = itemData.createdAt
-                    title.updatedAt = itemData.updatedAt
-                    
-                    // Create episodes
-                    for episodeData in itemData.episodes.filter({ $0.deletedAt == nil }) {
-                        let episode = Episode(context: context)
-                        episode.id = UUID(uuidString: episodeData.id) ?? UUID()
-                        episode.tmdbId = Int64(episodeData.tmdbId)
-                        episode.seasonNumber = Int16(episodeData.seasonNumber)
-                        episode.episodeNumber = Int16(episodeData.episodeNumber)
-                        episode.name = episodeData.name
-                        episode.overview = episodeData.overview
-                        episode.stillPath = episodeData.stillPath
-                        episode.airDate = episodeData.airDate
-                        episode.runtime = Int16(episodeData.runtime)
-                        episode.watched = episodeData.watched
-                        episode.watchedDate = episodeData.watchedDate
-                        episode.isStarred = episodeData.isStarred
-                        episode.show = title
+                if let deletedAt = listData.deletedAt {
+                    // Handle deleted lists
+                    if let existingList = existingListsById[listUUID] {
+                        Task { @MainActor in
+                            self.logDiagnostic("🗑️ Marking list '\(listData.name)' as deleted")
+                        }
+                        existingList.deletedAt = deletedAt
+                        existingList.updatedAt = listData.updatedAt
+                        existingList.deviceID = listData.deviceID
                     }
-                    
-                    // Create list item
-                    let listItem = ListItem(context: context)
-                    listItem.id = UUID()
-                    listItem.list = list
-                    listItem.title = title
-                    listItem.orderIndex = Int16(index)
-                    listItem.createdAt = itemData.createdAt
+                } else {
+                    // Handle active lists - update existing or create new
+                    if let existingList = existingListsById[listUUID] {
+                        Task { @MainActor in
+                            self.logDiagnostic("✏️ Updating existing list: '\(listData.name)' with \(listData.items.count) items")
+                        }
+                        // Update existing list properties
+                        existingList.name = listData.name
+                        existingList.updatedAt = listData.updatedAt
+                        existingList.deviceID = listData.deviceID
+                        existingList.order = listData.order
+                        existingList.deletedAt = nil
+                        
+                        // Update list items without recreating the list
+                        try self.updateListItems(existingList, with: listData.items, context: context)
+                    } else {
+                        Task { @MainActor in
+                            self.logDiagnostic("➕ Creating new list: '\(listData.name)' with \(listData.items.count) items")
+                        }
+                        // Create new list
+                        let list = MediaList(context: context)
+                        list.id = listUUID
+                        list.name = listData.name
+                        list.createdAt = listData.createdAt
+                        list.updatedAt = listData.updatedAt
+                        list.deviceID = listData.deviceID
+                        list.order = listData.order
+                        list.isDefault = false // Set properly later
+                        list.isShared = false
+                        list.icon = "list.bullet"
+                        
+                        // Create items for new list
+                        try self.createListItems(list, with: listData.items, context: context)
+                    }
+                }
+            }
+            
+            // Remove lists that weren't in the sync data (shouldn't happen normally)
+            for existingList in existingLists {
+                if let listId = existingList.id, !processedListIds.contains(listId) {
+                    Task { @MainActor in
+                        self.logDiagnostic("🗑️ Removing obsolete list: '\(existingList.displayName)'")
+                    }
+                    context.delete(existingList)
                 }
             }
             
@@ -1416,6 +1424,125 @@ final class CloudKitPublicSyncService: NSObject, ObservableObject {
                 self.logDiagnostic("✅ Core Data save completed successfully")
             }
         }
+    }
+    
+    // MARK: - Helper Methods for Update-in-Place
+    
+    private func updateListItems(_ list: MediaList, with syncItems: [SyncItemData], context: NSManagedObjectContext) throws {
+        // Get existing items for this list
+        let existingItems = list.sortedItems
+        let existingItemsById: [UUID: ListItem] = Dictionary(uniqueKeysWithValues: existingItems.compactMap { item in
+            guard let title = item.title, let titleId = title.id else { return nil }
+            return (titleId, item)
+        })
+        
+        var processedItemIds: Set<UUID> = []
+        
+        // Update or create items from sync data
+        for syncItem in syncItems {
+            guard let itemUUID = UUID(uuidString: syncItem.id) else { continue }
+            processedItemIds.insert(itemUUID)
+            
+            if let existingItem = existingItemsById[itemUUID] {
+                if let deletedAt = syncItem.deletedAt {
+                    // Mark item as deleted
+                    existingItem.deletedAt = deletedAt
+                    existingItem.updatedAt = syncItem.updatedAt
+                    existingItem.deviceID = syncItem.deviceID
+                } else {
+                    // Update existing item
+                    existingItem.order = syncItem.order
+                    existingItem.updatedAt = syncItem.updatedAt
+                    existingItem.deviceID = syncItem.deviceID
+                    existingItem.deletedAt = nil
+                    
+                    // Update associated title if needed
+                    if let title = existingItem.title {
+                        title.tmdbId = Int64(syncItem.tmdbId)
+                        title.mediaType = syncItem.mediaType
+                        title.title = syncItem.title
+                        title.year = Int16(syncItem.year)
+                        title.overview = syncItem.overview
+                        title.posterPath = syncItem.posterPath
+                        title.backdropPath = syncItem.backdropPath
+                        title.runtime = Int16(syncItem.runtime)
+                        title.watched = syncItem.watched
+                        title.watchedDate = syncItem.watchedDate
+                        title.updatedAt = syncItem.updatedAt
+                        title.deviceID = syncItem.deviceID
+                    }
+                }
+            } else if syncItem.deletedAt == nil {
+                // Create new item
+                try createTitleAndListItem(syncItem, for: list, context: context)
+            }
+        }
+        
+        // Handle items that weren't in sync data (mark as deleted if not already)
+        for existingItem in existingItems {
+            if let titleId = existingItem.title?.id, !processedItemIds.contains(titleId) {
+                existingItem.deletedAt = Date()
+                existingItem.updatedAt = Date()
+                existingItem.deviceID = DeviceIdentifier.shared.deviceID
+            }
+        }
+    }
+    
+    private func createListItems(_ list: MediaList, with syncItems: [SyncItemData], context: NSManagedObjectContext) throws {
+        for syncItem in syncItems.filter({ $0.deletedAt == nil }) {
+            try createTitleAndListItem(syncItem, for: list, context: context)
+        }
+    }
+    
+    private func createTitleAndListItem(_ syncItem: SyncItemData, for list: MediaList, context: NSManagedObjectContext) throws {
+        // Create title
+        let title = Title(context: context)
+        title.id = UUID(uuidString: syncItem.id) ?? UUID()
+        title.tmdbId = Int64(syncItem.tmdbId)
+        title.mediaType = syncItem.mediaType
+        title.title = syncItem.title
+        title.year = Int16(syncItem.year)
+        title.overview = syncItem.overview
+        title.posterPath = syncItem.posterPath
+        title.backdropPath = syncItem.backdropPath
+        title.runtime = Int16(syncItem.runtime)
+        title.watched = syncItem.watched
+        title.watchedDate = syncItem.watchedDate
+        title.userRating = syncItem.userRating ?? 0
+        title.createdAt = syncItem.createdAt
+        title.updatedAt = syncItem.updatedAt
+        title.deviceID = syncItem.deviceID
+        
+        // Create episodes
+        for episodeData in syncItem.episodes.filter({ $0.deletedAt == nil }) {
+            let episode = Episode(context: context)
+            episode.id = UUID(uuidString: episodeData.id) ?? UUID()
+            episode.tmdbId = Int64(episodeData.tmdbId)
+            episode.seasonNumber = Int16(episodeData.seasonNumber)
+            episode.episodeNumber = Int16(episodeData.episodeNumber)
+            episode.name = episodeData.name
+            episode.overview = episodeData.overview
+            episode.stillPath = episodeData.stillPath
+            episode.airDate = episodeData.airDate
+            episode.runtime = Int16(episodeData.runtime)
+            episode.watched = episodeData.watched
+            episode.watchedDate = episodeData.watchedDate
+            episode.isStarred = episodeData.isStarred
+            episode.createdAt = episodeData.createdAt
+            episode.updatedAt = episodeData.updatedAt
+            episode.deviceID = episodeData.deviceID
+            episode.show = title
+        }
+        
+        // Create list item
+        let listItem = ListItem(context: context)
+        listItem.id = UUID()
+        listItem.list = list
+        listItem.title = title
+        listItem.order = syncItem.order
+        listItem.createdAt = syncItem.createdAt
+        listItem.updatedAt = syncItem.updatedAt
+        listItem.deviceID = syncItem.deviceID
     }
     
     // MARK: - Device Backup Record Management

@@ -136,7 +136,7 @@ final class PersistenceController: ObservableObject {
     init(inMemory: Bool = false) {
         // MARK: - IMMEDIATE LWW RESET - BEFORE ANYTHING ELSE
         if !inMemory {
-            let currentVersion = "1.58.14"
+            let currentVersion = "1.58.15"
             let storedVersion = UserDefaults.standard.string(forKey: "app_version")
             let forceReset = storedVersion != currentVersion
             
