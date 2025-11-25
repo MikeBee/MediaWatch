@@ -369,28 +369,30 @@ final class LWWSyncService: NSObject, ObservableObject {
         // Fetch existing lists and create lookup by ID
         let fetchRequest = MediaList.fetchAll()
         let existingLists = try context.fetch(fetchRequest)
-        let existingListsById = Dictionary(uniqueKeysWithValues: existingLists.map { ($0.id, $0) })
+        let existingListsById = Dictionary(uniqueKeysWithValues: existingLists.compactMap { list in
+            guard let id = list.id else { return nil }
+            return (id, list)
+        })
         var processedListIds: Set<UUID> = []
         
         // Update or create lists from merged data
         for listData in lists {
-            processedListIds.insert(listData.id)
+            guard let listUUID = UUID(uuidString: listData.id) else { continue }
+            processedListIds.insert(listUUID)
             
             if let deletedAt = listData.deletedAt {
                 // Handle deleted lists
-                if let existingList = existingListsById[listData.id] {
+                if let existingList = existingListsById[listUUID] {
                     existingList.deletedAt = deletedAt
                     existingList.updatedAt = listData.updatedAt
                     existingList.deviceID = listData.deviceID
                 }
             } else {
                 // Handle active lists - update existing or create new
-                if let existingList = existingListsById[listData.id] {
+                if let existingList = existingListsById[listUUID] {
                     // Update existing list instead of deleting and recreating
                     existingList.name = listData.name
-                    existingList.icon = listData.icon
-                    existingList.colorHex = listData.colorHex
-                    existingList.isShared = listData.isShared
+                    // Note: SyncListData doesn't have icon, colorHex, isShared - keep existing values
                     existingList.updatedAt = listData.updatedAt
                     existingList.deviceID = listData.deviceID
                     existingList.order = listData.order
@@ -634,7 +636,7 @@ final class LWWSyncService: NSObject, ObservableObject {
     private func updateListItems(_ list: MediaList, with syncItems: [SyncItemData]) throws {
         // Get existing items for this list
         let existingItems = list.sortedItems
-        let existingItemsById = Dictionary(uniqueKeysWithValues: existingItems.compactMap { item in
+        let existingItemsById: [UUID: ListItem] = Dictionary(uniqueKeysWithValues: existingItems.compactMap { item in
             guard let title = item.title, let titleId = title.id else { return nil }
             return (titleId, item)
         })
@@ -643,9 +645,10 @@ final class LWWSyncService: NSObject, ObservableObject {
         
         // Update or create items from sync data
         for syncItem in syncItems {
-            processedItemIds.insert(syncItem.id)
+            guard let itemUUID = UUID(uuidString: syncItem.id) else { continue }
+            processedItemIds.insert(itemUUID)
             
-            if let existingItem = existingItemsById[syncItem.id] {
+            if let existingItem = existingItemsById[itemUUID] {
                 if let deletedAt = syncItem.deletedAt {
                     // Mark item as deleted
                     existingItem.deletedAt = deletedAt
