@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import UIKit
 
 // MARK: - Liked Status Enum
 
@@ -180,7 +181,7 @@ extension Title {
     /// Returns all notes sorted by creation date
     var sortedNotes: [Note] {
         guard let noteSet = notes as? Set<Note> else { return [] }
-        return noteSet.sorted { ($0.dateCreated ?? .distantPast) > ($1.dateCreated ?? .distantPast) }
+        return noteSet.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
     }
 
     // MARK: - Image URLs
@@ -203,7 +204,8 @@ extension Title {
     func toggleWatched() {
         watched.toggle()
         watchedDate = watched ? Date() : nil
-        dateModified = Date()
+        updatedAt = Date()
+        deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 
     /// Marks all episodes as watched or unwatched
@@ -215,7 +217,8 @@ extension Title {
             episode.watchedDate = watched ? Date() : nil
         }
 
-        dateModified = Date()
+        updatedAt = Date()
+        deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 
     /// Marks a specific season as watched or unwatched
@@ -227,7 +230,8 @@ extension Title {
             episode.watchedDate = watched ? Date() : nil
         }
 
-        dateModified = Date()
+        updatedAt = Date()
+        deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 }
 
@@ -238,7 +242,7 @@ extension Title {
     /// Fetch request for all titles
     static func fetchAll() -> NSFetchRequest<Title> {
         let request = NSFetchRequest<Title>(entityName: "Title")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Title.dateAdded, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Title.createdAt, ascending: false)]
         return request
     }
 
@@ -246,7 +250,7 @@ extension Title {
     static func fetchByType(_ mediaType: String) -> NSFetchRequest<Title> {
         let request = NSFetchRequest<Title>(entityName: "Title")
         request.predicate = NSPredicate(format: "mediaType == %@", mediaType)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Title.dateAdded, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Title.createdAt, ascending: false)]
         return request
     }
 

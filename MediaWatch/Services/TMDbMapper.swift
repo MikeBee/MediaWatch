@@ -7,6 +7,20 @@
 
 import Foundation
 import CoreData
+import UIKit
+
+// MARK: - Errors
+
+enum ListCreationError: LocalizedError {
+    case duplicateName(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .duplicateName(let name):
+            return "A list with the name '\(name)' already exists. Please choose a different name."
+        }
+    }
+}
 
 // MARK: - TMDb Mapper
 
@@ -76,11 +90,17 @@ struct TMDbMapper {
             title.year = parseYear(result.firstAirDate) ?? 0
         }
 
-        // Set timestamps for new entities
+        // Set LWW timestamps for new entities
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
         if existingTitle == nil {
-            title.dateAdded = Date()
+            title.createdAt = now
+            title.id = UUID()
+            title.deviceID = deviceID
         }
-        title.dateModified = Date()
+        title.updatedAt = now
+        title.deviceID = deviceID
 
         return title
     }
@@ -106,7 +126,10 @@ struct TMDbMapper {
         title.popularity = details.popularity ?? 0
         title.originalLanguage = details.originalLanguage
         title.genres = details.genreNames
-        title.dateModified = Date()
+        
+        // Update LWW metadata
+        title.updatedAt = Date()
+        title.deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
 
         return title
     }
@@ -134,7 +157,10 @@ struct TMDbMapper {
         title.popularity = details.popularity ?? 0
         title.originalLanguage = details.originalLanguage
         title.genres = details.genreNames
-        title.dateModified = Date()
+        
+        // Update LWW metadata
+        title.updatedAt = Date()
+        title.deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
 
         return title
     }
@@ -163,7 +189,8 @@ struct TMDbMapper {
         title.mediaType = "movie"
 
         if existingTitle == nil {
-            title.dateAdded = Date()
+            title.createdAt = Date()
+            title.deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
         }
 
         return mapMovieDetails(movieDetails, to: title)
@@ -193,7 +220,8 @@ struct TMDbMapper {
         title.mediaType = "tv"
 
         if existingTitle == nil {
-            title.dateAdded = Date()
+            title.createdAt = Date()
+            title.deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
         }
 
         return mapTVDetails(tvDetails, to: title)
@@ -295,25 +323,39 @@ struct TMDbMapper {
         colorHex: String? = nil,
         isDefault: Bool = false,
         context: NSManagedObjectContext
-    ) -> MediaList {
+    ) throws -> MediaList {
+        // Check for duplicate list names
+        let nameCheckRequest: NSFetchRequest<MediaList> = MediaList.fetchRequest()
+        nameCheckRequest.predicate = NSPredicate(format: "name == %@ AND deletedAt == nil", name)
+        
+        if let existingList = try context.fetch(nameCheckRequest).first {
+            throw ListCreationError.duplicateName(name)
+        }
+        
         let list = MediaList(context: context)
         list.id = UUID()
         list.name = name
         list.icon = icon ?? Constants.UI.defaultListIcon
         list.colorHex = colorHex ?? Constants.UI.defaultListColor
         list.isDefault = isDefault
-        list.dateCreated = Date()
-        list.dateModified = Date()
+        
+        // Set LWW metadata
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        list.createdAt = now
+        list.updatedAt = now
+        list.deviceID = deviceID
 
-        // Set sort order based on existing lists
+        // Set fractional order based on existing lists
         let fetchRequest: NSFetchRequest<MediaList> = MediaList.fetchRequest()
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: false)]
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.order, ascending: false)]
         fetchRequest.fetchLimit = 1
 
         if let lastList = try? context.fetch(fetchRequest).first {
-            list.sortOrder = lastList.sortOrder + 1
+            list.order = lastList.order + 1.0
         } else {
-            list.sortOrder = 0
+            list.order = 1.0
         }
 
         return list
@@ -340,16 +382,26 @@ struct TMDbMapper {
         item.id = UUID()
         item.list = list
         item.title = title
-        item.dateAdded = Date()
+        
+        // Set LWW metadata
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        item.createdAt = now
+        item.updatedAt = now
+        item.deviceID = deviceID
 
-        // Set order index
+        // Set fractional order
         if let items = list.items as? Set<ListItem> {
-            item.orderIndex = Int16(items.count)
+            let maxOrder = items.map(\.order).max() ?? 0
+            item.order = maxOrder + 1.0
         } else {
-            item.orderIndex = 0
+            item.order = 1.0
         }
 
-        list.dateModified = Date()
+        // Update list metadata
+        list.updatedAt = now
+        list.deviceID = deviceID
 
         return item
     }
@@ -369,8 +421,14 @@ struct TMDbMapper {
         note.text = text
         note.ownerOnly = ownerOnly
         note.title = title
-        note.dateCreated = Date()
-        note.dateModified = Date()
+        
+        // Set LWW metadata
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        note.createdAt = now
+        note.updatedAt = now
+        note.deviceID = deviceID
 
         return note
     }
@@ -388,8 +446,14 @@ struct TMDbMapper {
         note.text = text
         note.ownerOnly = ownerOnly
         note.episode = episode
-        note.dateCreated = Date()
-        note.dateModified = Date()
+        
+        // Set LWW metadata
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        note.createdAt = now
+        note.updatedAt = now
+        note.deviceID = deviceID
 
         return note
     }
@@ -409,7 +473,7 @@ struct TMDbMapper {
         prefs.id = UUID()
         prefs.imageQuality = Constants.TMDb.ImageSize.posterMedium
         prefs.showWatchedInLists = true
-        prefs.sortBy = "dateAdded"
+        prefs.sortBy = "createdAt"
         prefs.sortAscending = false
 
         return prefs

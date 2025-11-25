@@ -92,7 +92,7 @@ struct ShareListButton: View {
             if let share = share {
                 CloudSharingView(
                     share: share,
-                    container: CKContainer(identifier: "iCloud.com.mediashows.app"),
+                    container: CKContainer(identifier: "iCloud.reasonality.MediaShows"),
                     list: list
                 )
             }

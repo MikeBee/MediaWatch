@@ -210,7 +210,7 @@ actor BackupService {
         let preferences = try await fetchPreferences(context: context)
 
         let backup = BackupData(
-            version: "1.0",
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             exportDate: Date(),
             lists: lists,
             titles: titles,

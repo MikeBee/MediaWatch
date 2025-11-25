@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import UIKit
 
 extension Note {
 
@@ -23,7 +24,7 @@ extension Note {
 
     /// Returns formatted creation date
     var displayDate: String {
-        guard let date = dateCreated else { return "" }
+        guard let date = createdAt else { return "" }
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -62,13 +63,15 @@ extension Note {
     /// Updates the note text
     func updateText(_ newText: String) {
         text = newText
-        dateModified = Date()
+        updatedAt = Date()
+        deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 
     /// Toggles the owner-only flag
     func toggleOwnerOnly() {
         ownerOnly.toggle()
-        dateModified = Date()
+        updatedAt = Date()
+        deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 }
 
@@ -79,7 +82,7 @@ extension Note {
     /// Fetch request for all notes
     static func fetchAll() -> NSFetchRequest<Note> {
         let request = NSFetchRequest<Note>(entityName: "Note")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.dateCreated, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.createdAt, ascending: false)]
         return request
     }
 
@@ -87,7 +90,7 @@ extension Note {
     static func fetchForTitle(_ title: Title) -> NSFetchRequest<Note> {
         let request = NSFetchRequest<Note>(entityName: "Note")
         request.predicate = NSPredicate(format: "title == %@", title)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.dateCreated, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.createdAt, ascending: false)]
         return request
     }
 
@@ -95,7 +98,7 @@ extension Note {
     static func fetchForEpisode(_ episode: Episode) -> NSFetchRequest<Note> {
         let request = NSFetchRequest<Note>(entityName: "Note")
         request.predicate = NSPredicate(format: "episode == %@", episode)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.dateCreated, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.createdAt, ascending: false)]
         return request
     }
 }

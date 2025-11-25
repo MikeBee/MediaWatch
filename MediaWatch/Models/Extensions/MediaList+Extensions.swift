@@ -8,6 +8,7 @@
 import Foundation
 import CoreData
 import SwiftUI
+import UIKit
 
 extension MediaList {
 
@@ -75,7 +76,7 @@ extension MediaList {
     var sortedTitles: [Title] {
         guard let itemSet = items as? Set<ListItem> else { return [] }
         return itemSet
-            .sorted { $0.orderIndex < $1.orderIndex }
+            .sorted { $0.order < $1.order }
             .compactMap { $0.title }
     }
 
@@ -86,10 +87,10 @@ extension MediaList {
 
     // MARK: - List Items
 
-    /// Returns sorted list items
+    /// Returns sorted list items using fractional ordering
     var sortedItems: [ListItem] {
         guard let itemSet = items as? Set<ListItem> else { return [] }
-        return itemSet.sorted { $0.orderIndex < $1.orderIndex }
+        return itemSet.sorted { $0.order < $1.order }
     }
 
     /// Gets the list item for a specific title
@@ -100,24 +101,45 @@ extension MediaList {
 
     // MARK: - Actions
 
-    /// Adds a title to the list
+    /// Adds a title to the list with LWW metadata
     @discardableResult
     func addTitle(_ title: Title, context: NSManagedObjectContext) -> ListItem {
         let item = ListItem(context: context)
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
         item.id = UUID()
         item.list = self
         item.title = title
-        item.orderIndex = Int16(titleCount)
-        item.dateAdded = Date()
-        dateModified = Date()
+        item.createdAt = now
+        item.updatedAt = now
+        item.deviceID = deviceID
+        
+        // Use fractional ordering - place at end
+        let lastOrder = sortedItems.last?.order ?? 0
+        item.order = lastOrder + 1.0
+        
+        // Update list metadata
+        updatedAt = now
+        self.deviceID = deviceID
+        
         return item
     }
 
-    /// Removes a title from the list
+    /// Removes a title from the list using tombstone pattern
     func removeTitle(_ title: Title, context: NSManagedObjectContext) {
         guard let item = listItem(for: title) else { return }
-        context.delete(item)
-        dateModified = Date()
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        // Mark as deleted (tombstone) instead of actually deleting
+        item.deletedAt = now
+        item.updatedAt = now
+        item.deviceID = deviceID
+        
+        // Update list metadata
+        updatedAt = now
+        self.deviceID = deviceID
     }
 
     /// Checks if a title is in this list
@@ -125,14 +147,21 @@ extension MediaList {
         listItem(for: title) != nil
     }
 
-    /// Updates the order of list items
+    /// Updates the order of list items using fractional ordering
     func updateOrder(_ titles: [Title]) {
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
         for (index, title) in titles.enumerated() {
             if let item = listItem(for: title) {
-                item.orderIndex = Int16(index)
+                item.order = Double(index + 1)
+                item.updatedAt = now
+                item.deviceID = deviceID
             }
         }
-        dateModified = Date()
+        
+        updatedAt = now
+        self.deviceID = deviceID
     }
 }
 
@@ -143,15 +172,62 @@ extension MediaList {
     /// Fetch request for all lists sorted by order
     static func fetchAll() -> NSFetchRequest<MediaList> {
         let request = NSFetchRequest<MediaList>(entityName: "List")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.order, ascending: true)]
         return request
     }
 
     /// Fetch request for the default list
     static func fetchDefault() -> NSFetchRequest<MediaList> {
         let request = NSFetchRequest<MediaList>(entityName: "List")
-        request.predicate = NSPredicate(format: "isDefault == YES")
+        request.predicate = NSPredicate(format: "isDefault == YES AND deletedAt == NULL")
         request.fetchLimit = 1
         return request
+    }
+    
+    /// Fetch request for non-deleted lists only
+    static func fetchActive() -> NSFetchRequest<MediaList> {
+        let request = NSFetchRequest<MediaList>(entityName: "List")
+        request.predicate = NSPredicate(format: "deletedAt == NULL")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.order, ascending: true)]
+        return request
+    }
+}
+
+// MARK: - LWW Support
+
+extension MediaList {
+    
+    /// Returns true if this list is deleted (has a deletedAt timestamp)
+    var isListDeleted: Bool {
+        return deletedAt != nil
+    }
+    
+    /// Returns true if this list is a tombstone (deleted but kept for sync)
+    var isTombstone: Bool {
+        return isListDeleted
+    }
+    
+    /// Updates the list's timestamp and device ID to mark it as modified
+    func markAsModified() {
+        let now = Date()
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        
+        updatedAt = now
+        self.deviceID = deviceID
+    }
+    
+    /// Returns active (non-deleted) items in this list
+    var activeItems: [ListItem] {
+        return sortedItems.filter { $0.deletedAt == nil }
+    }
+    
+    /// Returns the actual count of active titles (non-deleted)
+    var activeTitleCount: Int {
+        return activeItems.count
+    }
+    
+    /// Returns the number of active watched titles
+    var activeWatchedCount: Int {
+        return activeItems.filter { $0.title?.watched == true }.count
     }
 }

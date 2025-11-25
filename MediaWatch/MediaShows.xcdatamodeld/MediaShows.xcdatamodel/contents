@@ -2,6 +2,9 @@
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22758" systemVersion="23F79" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="">
     <entity name="Episode" representedClassName="Episode" syncable="YES" codeGenerationType="class">
         <attribute name="airDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="episodeNumber" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="isStarred" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
@@ -12,6 +15,7 @@
         <attribute name="seasonNumber" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="stillPath" optional="YES" attributeType="String"/>
         <attribute name="tmdbId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="watched" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="watchedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="notes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Note" inverseName="episode" inverseEntity="Note"/>
@@ -19,29 +23,36 @@
     </entity>
     <entity name="List" representedClassName="MediaList" syncable="YES" codeGenerationType="class">
         <attribute name="colorHex" optional="YES" attributeType="String"/>
-        <attribute name="dateCreated" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
-        <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="icon" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="isDefault" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isShared" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="name" attributeType="String" defaultValueString=""/>
-        <attribute name="sortOrder" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="order" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <relationship name="items" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ListItem" inverseName="list" inverseEntity="ListItem"/>
     </entity>
     <entity name="ListItem" representedClassName="ListItem" syncable="YES" codeGenerationType="class">
-        <attribute name="dateAdded" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="orderIndex" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="order" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <relationship name="list" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="List" inverseName="items" inverseEntity="List"/>
         <relationship name="title" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Title" inverseName="listItems" inverseEntity="Title"/>
     </entity>
     <entity name="Note" representedClassName="Note" syncable="YES" codeGenerationType="class">
-        <attribute name="dateCreated" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
-        <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="ownerOnly" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="text" attributeType="String" defaultValueString=""/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <relationship name="episode" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Episode" inverseName="notes" inverseEntity="Episode"/>
         <relationship name="title" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Title" inverseName="notes" inverseEntity="Title"/>
     </entity>
@@ -51,8 +62,10 @@
         <attribute name="currentSeason" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
         <attribute name="customField1" optional="YES" attributeType="String"/>
         <attribute name="customField2" optional="YES" attributeType="String"/>
-        <attribute name="dateAdded" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
-        <attribute name="dateModified" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="firstAirDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="genres" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformerName" customClassName="[String]"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
@@ -94,13 +107,17 @@
     </entity>
     <entity name="UserPreferences" representedClassName="UserPreferences" syncable="YES" codeGenerationType="class">
         <attribute name="appVersion" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="defaultLikedStatus" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="defaultListId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="imageQuality" attributeType="String" defaultValueString="w500"/>
         <attribute name="lastSyncDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="showWatchedInLists" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="sortAscending" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="sortBy" attributeType="String" defaultValueString="dateAdded"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
     </entity>
 </model>

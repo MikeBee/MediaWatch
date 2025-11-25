@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import UIKit
 
 extension Episode {
 
@@ -66,7 +67,7 @@ extension Episode {
     /// Returns all notes for this episode sorted by creation date
     var sortedNotes: [Note] {
         guard let noteSet = notes as? Set<Note> else { return [] }
-        return noteSet.sorted { ($0.dateCreated ?? .distantPast) > ($1.dateCreated ?? .distantPast) }
+        return noteSet.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
     }
 }
 

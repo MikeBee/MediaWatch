@@ -275,7 +275,7 @@ struct HomeView: View {
 
     // Fetch Current titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.updatedAt, ascending: false)],
         predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.current.rawValue),
         animation: .default
     )
@@ -283,7 +283,7 @@ struct HomeView: View {
 
     // Fetch New titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.updatedAt, ascending: false)],
         predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.new.rawValue),
         animation: .default
     )
@@ -291,7 +291,7 @@ struct HomeView: View {
 
     // Fetch Paused titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.updatedAt, ascending: false)],
         predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.paused.rawValue),
         animation: .default
     )
@@ -299,7 +299,7 @@ struct HomeView: View {
 
     // Fetch Maybe titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.updatedAt, ascending: false)],
         predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.maybe.rawValue),
         animation: .default
     )
@@ -307,7 +307,7 @@ struct HomeView: View {
 
     // Fetch Finished titles
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateModified, ascending: false)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.updatedAt, ascending: false)],
         predicate: NSPredicate(format: "watchStatus == %d", WatchStatus.finished.rawValue),
         animation: .default
     )
@@ -439,6 +439,15 @@ struct HomeView: View {
                             }
                         } label: {
                             Image(systemName: viewMode == .carousel ? "rectangle.split.1x2" : (viewMode == .grid ? "square.grid.2x2" : "list.bullet"))
+                        }
+                        
+                        // Nuclear Reset Menu (for debugging LWW migration)
+                        Menu {
+                            Button("⚠️ NUCLEAR RESET - Clear All Data", role: .destructive) {
+                                PersistenceController.shared.clearAllDataAndCloudKitState()
+                            }
+                        } label: {
+                            Image(systemName: "gear.badge.xmark")
                         }
                     }
                 }
@@ -693,7 +702,7 @@ struct ListsView: View {
     @StateObject private var appSettings = AppSettings.shared
 
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.order, ascending: true)],
         animation: .default
     )
     private var allLists: FetchedResults<MediaList>
@@ -703,6 +712,7 @@ struct ListsView: View {
     @State private var newListIcon = "list.bullet"
     @State private var newListColor = "007AFF"
     @State private var editMode: EditMode = .inactive
+    @State private var errorMessage: String?
 
     private var sortMode: ListSortMode {
         ListSortMode(rawValue: appSettings.listsSortMode) ?? .manual
@@ -749,7 +759,7 @@ struct ListsView: View {
             }
         case .manual:
             results.sort { list1, list2 in
-                return isAscending ? list1.sortOrder < list2.sortOrder : list1.sortOrder > list2.sortOrder
+                return isAscending ? list1.order < list2.order : list1.order > list2.order
             }
         }
 
@@ -947,32 +957,40 @@ struct ListsView: View {
                     onCreate: createList
                 )
             }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                }
+            }
         }
     }
 
     private func createList() {
         withAnimation {
-            let list = TMDbMapper.createList(
-                name: newListName.isEmpty ? "New List" : newListName,
-                icon: newListIcon,
-                colorHex: newListColor,
-                context: viewContext
-            )
-
-            if allLists.isEmpty {
-                list.isDefault = true
-            }
-
-            // Set sortOrder to be at the end
-            list.sortOrder = Int16(allLists.count)
-
             do {
-                try viewContext.save()
-            } catch {
-                print("Error creating list: \(error)")
-            }
+                let list = try TMDbMapper.createList(
+                    name: newListName.isEmpty ? "New List" : newListName,
+                    icon: newListIcon,
+                    colorHex: newListColor,
+                    context: viewContext
+                )
 
-            newListName = ""
+                if allLists.isEmpty {
+                    list.isDefault = true
+                }
+
+                // Set order to be at the end
+                list.order = Double(allLists.count)
+
+                try viewContext.save()
+                newListName = ""
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             newListIcon = "list.bullet"
             newListColor = "007AFF"
         }
@@ -982,9 +1000,9 @@ struct ListsView: View {
         var listsArray = filteredAndSortedLists
         listsArray.move(fromOffsets: source, toOffset: destination)
 
-        // Update sortOrder for all lists
+        // Update order for all lists
         for (index, list) in listsArray.enumerated() {
-            list.sortOrder = Int16(index)
+            list.order = Double(index)
         }
 
         do {
@@ -1312,9 +1330,9 @@ struct ListDetailView: View {
             let result: Bool
             switch sortOption {
             case .added:
-                result = (first.dateAdded ?? Date.distantPast) > (second.dateAdded ?? Date.distantPast)
+                result = (first.createdAt ?? Date.distantPast) > (second.createdAt ?? Date.distantPast)
             case .updated:
-                result = (first.dateModified ?? Date.distantPast) > (second.dateModified ?? Date.distantPast)
+                result = (first.updatedAt ?? Date.distantPast) > (second.updatedAt ?? Date.distantPast)
             case .alpha:
                 result = (first.title ?? "") < (second.title ?? "")
             case .started:
@@ -1571,7 +1589,7 @@ struct ListDetailView: View {
             Button("Save") {
                 if !newListName.isEmpty {
                     list.name = newListName
-                    list.dateModified = Date()
+                    list.updatedAt = Date()
                     try? viewContext.save()
                 }
             }
@@ -2063,7 +2081,7 @@ struct TitleDetailView: View {
                 ForEach(WatchStatus.allCases, id: \.rawValue) { status in
                     Button {
                         title.watchStatus = status.rawValue
-                        title.dateModified = Date()
+                        title.updatedAt = Date()
                         try? viewContext.save()
                     } label: {
                         VStack(spacing: 6) {
@@ -2608,7 +2626,7 @@ struct TitleDetailView: View {
                 .font(.subheadline)
             }
 
-            let notesArray = (title.notes as? Set<Note>)?.sorted { $0.dateModified ?? Date() > $1.dateModified ?? Date() } ?? []
+            let notesArray = (title.notes as? Set<Note>)?.sorted { $0.updatedAt ?? Date() > $1.updatedAt ?? Date() } ?? []
 
             if notesArray.isEmpty {
                 Button {
@@ -2859,7 +2877,7 @@ struct TitleDetailView: View {
                                         }
                                     }
                                     // Update title to trigger UI refresh
-                                    title.dateModified = Date()
+                                    title.updatedAt = Date()
                                     title.objectWillChange.send()
                                     try? viewContext.save()
                                     episodeRefreshTrigger.toggle()
@@ -2891,7 +2909,7 @@ struct TitleDetailView: View {
                                                     }
                                                 }
                                                 // Update title to trigger UI refresh
-                                                title.dateModified = Date()
+                                                title.updatedAt = Date()
                                                 title.objectWillChange.send()
                                                 try? viewContext.save()
                                                 episodeRefreshTrigger.toggle()
@@ -2905,7 +2923,7 @@ struct TitleDetailView: View {
                                             Button {
                                                 episode.isStarred.toggle()
                                                 // Update title dateModified so starred episodes show in History
-                                                title.dateModified = Date()
+                                                title.updatedAt = Date()
                                                 title.objectWillChange.send()
                                                 try? viewContext.save()
                                                 episodeRefreshTrigger.toggle()
@@ -3096,7 +3114,7 @@ struct TitleDetailView: View {
                     nextStatus = .current
                 }
                 title.watchStatus = nextStatus.rawValue
-                title.dateModified = Date()
+                title.updatedAt = Date()
                 try? viewContext.save()
             } label: {
                 VStack(spacing: 4) {
@@ -3241,7 +3259,7 @@ struct EpisodeRow: View {
                     episode.show?.lastWatched = Date()
                 }
                 // Update show's dateModified so episode activity shows in History
-                episode.show?.dateModified = Date()
+                episode.show?.updatedAt = Date()
                 episode.show?.objectWillChange.send()
                 try? viewContext.save()
             } label: {
@@ -3369,7 +3387,7 @@ struct NotesEditorSheet: View {
         if let notes = title.notes as? Set<Note>,
            let existingNote = notes.first {
             existingNote.text = noteText
-            existingNote.dateModified = Date()
+            existingNote.updatedAt = Date()
         } else if !noteText.isEmpty {
             _ = TMDbMapper.createNote(text: noteText, for: title, context: viewContext)
         }
@@ -3386,7 +3404,7 @@ struct ListManagerSheet: View {
     @ObservedObject var title: Title
 
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \MediaList.order, ascending: true)],
         animation: .default
     )
     private var allLists: FetchedResults<MediaList>
@@ -3477,7 +3495,7 @@ struct SearchView: View {
 
     @FetchRequest(
         entity: Title.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \Title.dateAdded, ascending: false)]
+        sortDescriptors: [NSSortDescriptor(keyPath: \Title.createdAt, ascending: false)]
     ) private var allTitles: FetchedResults<Title>
 
     @State private var searchText = ""
@@ -4292,6 +4310,7 @@ struct AddToListSheet: View {
 
     @State private var lists: [MediaList] = []
     @State private var isAdding = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -4355,12 +4374,21 @@ struct AddToListSheet: View {
                 
                 fetchLists()
             }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                }
+            }
         }
     }
 
     private func fetchLists() {
         let request: NSFetchRequest<MediaList> = NSFetchRequest(entityName: "List")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.sortOrder, ascending: true)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \MediaList.order, ascending: true)]
 
         do {
             lists = try viewContext.fetch(request)
@@ -4370,19 +4398,19 @@ struct AddToListSheet: View {
     }
 
     private func createDefaultList() {
-        _ = TMDbMapper.createList(
-            name: "Watchlist",
-            icon: "list.bullet",
-            colorHex: "007AFF",
-            isDefault: true,
-            context: viewContext
-        )
-
         do {
+            _ = try TMDbMapper.createList(
+                name: "Watchlist",
+                icon: "list.bullet",
+                colorHex: "007AFF",
+                isDefault: true,
+                context: viewContext
+            )
+
             try viewContext.save()
             fetchLists()
         } catch {
-            print("Error creating list: \(error)")
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -4741,10 +4769,28 @@ struct ProfileView: View {
                 // Sync Section
                 Section("Sync") {
                     HStack {
-                        Label("iCloud Sync", systemImage: "icloud")
+                        Label("Legacy iCloud Sync", systemImage: "icloud")
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                        Text("Disabled")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .opacity(0.6)
+                    
+                    NavigationLink(destination: CloudKitPublicSyncSettingsView()) {
+                        HStack {
+                            Label("CloudKit Public Sync", systemImage: "icloud.badge.gearshape")
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Cross Apple ID")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                        }
                     }
 
                     HStack {
@@ -4900,7 +4946,7 @@ struct ProfileView: View {
                     HStack {
                         Label("Version", systemImage: "info.circle")
                         Spacer()
-                        Text("1.0.0")
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                             .foregroundStyle(.secondary)
                     }
 
@@ -4917,6 +4963,7 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .task {
                 cacheSize = await ImageCacheService.shared.formattedDiskCacheSize()
+                
             }
             .alert("Clear Cache", isPresented: $showingClearCacheAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -5101,8 +5148,8 @@ struct ProfileView: View {
     private func clearAllHistory() {
         // Clear all activity-related dates from titles
         for title in allTitles {
-            title.dateAdded = nil
-            title.dateModified = nil
+            title.createdAt = nil
+            title.updatedAt = nil
             title.lastWatched = nil
             title.watchedDate = nil
 
@@ -5121,11 +5168,11 @@ struct ProfileView: View {
 
         for title in allTitles {
             // Clear dates older than 60 days
-            if let dateAdded = title.dateAdded, dateAdded < sixtyDaysAgo {
-                title.dateAdded = nil
+            if let createdAt = title.createdAt, createdAt < sixtyDaysAgo {
+                title.createdAt = nil
             }
-            if let dateModified = title.dateModified, dateModified < sixtyDaysAgo {
-                title.dateModified = nil
+            if let updatedAt = title.updatedAt, updatedAt < sixtyDaysAgo {
+                title.updatedAt = nil
             }
             if let lastWatched = title.lastWatched, lastWatched < sixtyDaysAgo {
                 title.lastWatched = nil
@@ -5165,9 +5212,9 @@ struct ProfileView: View {
     }
 
     private func clearAddedShowsCount() {
-        // Clear all title dateAdded values
+        // Clear all title createdAt values
         for title in allTitles {
-            title.dateAdded = nil
+            title.createdAt = nil
         }
         try? viewContext.save()
     }
@@ -5263,7 +5310,7 @@ struct ActivityView: View {
                 Section("Added Shows") {
                     let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
                     let recentShows = allTitles.filter { title in
-                        if let date = title.dateAdded {
+                        if let date = title.createdAt {
                             return date >= sixtyDaysAgo
                         }
                         return false
@@ -5488,7 +5535,7 @@ struct HistoryListView: View {
 
         for title in allTitles {
             // Title added
-            if let date = title.dateAdded, date >= oneYearAgo {
+            if let date = title.createdAt, date >= oneYearAgo {
                 events.append(ActivityEvent(
                     date: date,
                     type: .added,
@@ -5499,7 +5546,7 @@ struct HistoryListView: View {
             }
 
             // Title modified (ratings, status changes, etc.)
-            if let date = title.dateModified, date >= oneYearAgo, date != title.dateAdded {
+            if let date = title.updatedAt, date >= oneYearAgo, date != title.createdAt {
                 // Check what was modified
                 if title.mikeRating > 0 || title.lauraRating > 0 || title.userRating > 0 {
                     let ratingText = [
@@ -5520,7 +5567,7 @@ struct HistoryListView: View {
                     }
                 }
 
-                // Note: Status change tracking removed because dateModified is updated
+                // Note: Status change tracking removed because updatedAt is updated
                 // for various reasons (ratings, episodes watched/starred, etc.) and we
                 // cannot reliably determine when the actual watch status changed
 
@@ -5580,9 +5627,9 @@ struct HistoryListView: View {
 
                     // Individual episodes starred/favorited
                     if episode.isStarred {
-                        // Use the show's dateModified as a proxy for when the episode was starred
-                        // since episodes don't have their own dateModified field
-                        if let date = title.dateModified, date >= oneYearAgo {
+                        // Use the show's updatedAt as a proxy for when the episode was starred
+                        // since episodes don't have their own updatedAt field
+                        if let date = title.updatedAt, date >= oneYearAgo {
                             let episodeLabel = "S\(episode.seasonNumber)E\(episode.episodeNumber)"
                             events.append(ActivityEvent(
                                 date: date,
